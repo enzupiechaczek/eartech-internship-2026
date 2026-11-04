@@ -21,7 +21,33 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'home' %}">Home</a>
                     </li>
-                    <!-- Add more navigation links here -->
+                    {% if user.is_authenticated %}
+                        {% if user.role == 'INSTRUCTOR' %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'studio' %}">Creator Studio</a>
+                            </li>
+                        {% elif user.role == 'STUDENT' %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'dashboard' %}">My Learning</a>
+                            </li>
+                        {% endif %}
+                        <li class="nav-item">
+                            <span class="navbar-text me-2">Hi, {{ user.first_name }}</span>
+                        </li>    
+                        <li class="nav-item">
+                            <form method="post" action="{% url 'logout' %}" class="d-inline">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-link nav-link">Logout</button>
+                            </form>
+                        </li>
+                    {% else %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'login' %}">Login</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'register' %}">Register</a>
+                        </li>
+                    {% endif %}
                 </ul>
             </div>
         </div>
