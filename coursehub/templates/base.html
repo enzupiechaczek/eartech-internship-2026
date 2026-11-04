@@ -24,11 +24,11 @@
                     {% if user.is_authenticated %}
                         {% if user.role == 'INSTRUCTOR' %}
                             <li class="nav-item">
-                                <a class="nav-link" href="{% url 'studio' %}">Creator Studio</a>
+                                <a class="nav-link" href="#">Creator Studio</a>
                             </li>
                         {% elif user.role == 'STUDENT' %}
                             <li class="nav-item">
-                                <a class="nav-link" href="{% url 'dashboard' %}">My Learning</a>
+                                <a class="nav-link" href="#">My Learning</a>
                             </li>
                         {% endif %}
                         <li class="nav-item">
@@ -45,7 +45,7 @@
                             <a class="nav-link" href="{% url 'login' %}">Login</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{% url 'register' %}">Register</a>
+                            <a class="nav-link" href="#">Register</a>
                         </li>
                     {% endif %}
                 </ul>
