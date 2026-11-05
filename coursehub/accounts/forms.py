@@ -8,7 +8,11 @@ class RegisterForm(UserCreationForm):
     email = forms.EmailField(required=True)
 
     role = forms.ChoiceField(
-        choices=[(User.Role.STUDENT, 'Student')],
+        choices=[
+         (User.Role.STUDENT, 'Student'),
+         (User.Role.INSTRUCTOR, 'Instructor'),
+
+        ],
         initial=User.Role.STUDENT,
         required=True
     )

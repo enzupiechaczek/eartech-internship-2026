@@ -102,3 +102,20 @@ class RegistrationTest(TestCase):
             1
         )
 
+
+
+    def test_instructor_registration(self):
+        response = self.client.post(
+            reverse('register'),
+            {
+                'username': 'instructor_test',
+                'email': 'instructor@test.com',
+                'role': User.Role.INSTRUCTOR,
+                'password1': 'StrongPass123!',
+                'password2': 'StrongPass123!',
+            }
+        )
+
+        self.assertEqual(response.status_code, 302)
+        user = User.objects.get(username='instructor_test')
+        self.assertEqual(user.role, User.Role.INSTRUCTOR)
