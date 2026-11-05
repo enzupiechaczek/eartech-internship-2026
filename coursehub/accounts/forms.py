@@ -1,5 +1,4 @@
 from django import forms
-from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from accounts.models import User
 
@@ -9,7 +8,8 @@ class RegisterForm(UserCreationForm):
     email = forms.EmailField(required=True)
 
     role = forms.ChoiceField(
-        choices=User.Role.choices,
+        choices=[(User.Role.STUDENT, 'Student')],
+        initial=User.Role.STUDENT,
         required=True
     )
 
