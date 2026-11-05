@@ -3,8 +3,25 @@
 {% block title %}Home | CourseHub{% endblock %}
 
 {% block content %}
-    <h1 class="text-primary">Welcome to CourseHub</h1>
-    <p class="lead">This text is styled by Bootstrap.</p>
-    <button class="btn btn-success">Test button</button>
-    <div class="alert alert-info mt-3">If this box is light blue, Bootstrap works!</div>
+    <div class="container py-4">
+    <h2 class="mb-4">Featured Courses</h2>
+    <div class="row">
+        {% for c in courses %}
+        <div class="col-md-3 mb-3">
+            <div class="card h-100">
+            <img class="card-img-top"
+                src="{% if c.thumbnail %}{{ c.thumbnail.url }}{% else %}https://placehold.co/300x170{% endif %}"
+                alt="{{ c.title }}">
+            <div class="card-body">
+                <h5>{{ c.title|truncatechars:40 }}</h5>
+                <p class="text-muted">by {{ c.instructor.get_full_name|default:c.instructor.username }}</p>
+                <b>{% if c.price > 0 %}${{ c.price|floatformat:2 }}{% else %}Free{% endif %}</b>
+            </div>
+            </div>
+        </div>
+        {% empty %}
+        <p>No courses yet.</p>
+        {% endfor %}
+    </div>
+    </div>
 {% endblock %}
