@@ -24,10 +24,12 @@
                     {% if user.is_authenticated %}
                         {% if user.role == 'INSTRUCTOR' %}
                             <li class="nav-item">
+                                <!-- TODO: real URL in Sprint 2/3 -->
                                 <a class="nav-link" href="#">Creator Studio</a>
                             </li>
                         {% elif user.role == 'STUDENT' %}
                             <li class="nav-item">
+                                <!-- TODO: real URL in Sprint 2/3 -->
                                 <a class="nav-link" href="#">My Learning</a>
                             </li>
                         {% endif %}
@@ -45,7 +47,7 @@
                             <a class="nav-link" href="{% url 'login' %}">Login</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="#">Register</a>
+                            <a class="nav-link" href="register">Register</a>
                         </li>
                     {% endif %}
                 </ul>
