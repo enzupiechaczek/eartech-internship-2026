@@ -23,13 +23,9 @@ class Course(models.Model):
         blank=True,
     )
 
-    is_published = models.BooleanField(
-        default=False
-    )
+    is_published = models.BooleanField(default=False)
 
-    created_at = models.DateTimeField(
-        auto_now_add=True
-    )
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.title

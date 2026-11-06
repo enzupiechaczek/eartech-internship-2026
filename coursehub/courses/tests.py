@@ -1,21 +1,15 @@
 from django.test import TestCase
 from django.urls import reverse
-
+from decimal import Decimal
+from django.contrib.auth import get_user_model
+from django.test import TestCase
+from django.urls import reverse
+from .models import Course
 
 class CourseListViewTests(TestCase):
     def test_course_list_page_loads(self):
         response = self.client.get(reverse('courses:list'))
         self.assertEqual(response.status_code, 200)
-# Create your tests here.
-
-from decimal import Decimal
-
-from django.contrib.auth import get_user_model
-from django.test import TestCase
-from django.urls import reverse
-
-from .models import Course
-
 
 class HomeViewTests(TestCase):
     def setUp(self):
