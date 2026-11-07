@@ -58,6 +58,8 @@
     <!-- ===== Site Content ===== -->
     <main class="container site-main">
         {% block content %}{% endblock %}
+        {% if lesson.embed %}<div class="ratio ratio-16x9"><iframe src="{{ lesson.embed }}" allowfullscreen></iframe></div>
+        {% else %}<p class="text-danger">Video link is not valid.</p>{% endif %}
     </main>
 
     <!-- ===== Footer ===== -->

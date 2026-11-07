@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block title %}Create course | CourseHub{% endblock %}
+
+{% block content %}
+    <h1>Create course</h1>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button class="btn btn-primary" type="submit">Create course</button>
+        <a class="btn btn-outline-secondary" href="{% url cancel_url %}">Cancel</a>
+    </form>
+{% endblock %}

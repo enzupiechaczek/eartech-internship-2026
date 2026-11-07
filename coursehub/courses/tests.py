@@ -1,70 +1,202 @@
-from django.test import TestCase
-from django.urls import reverse
-from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
-from .models import Course
 
-class CourseListViewTests(TestCase):
-    def test_course_list_page_loads(self):
-        response = self.client.get(reverse('courses:list'))
-        self.assertEqual(response.status_code, 200)
+from .models import Course, Lesson, Module
 
-class HomeViewTests(TestCase):
+
+User = get_user_model()
+
+
+class CurriculumManagementTests(TestCase):
     def setUp(self):
-        self.omar = get_user_model().objects.create_user(
-            username="omar",
-            password="pass",
-            first_name="Omar",
-            last_name="Ali",
+        self.instructor = User.objects.create_user(
+            username="instructor",
+            password="Password123!",
+            role=User.Role.INSTRUCTOR,
+        )
+        self.other_instructor = User.objects.create_user(
+            username="other-instructor",
+            password="Password123!",
+            role=User.Role.INSTRUCTOR,
+        )
+        self.student = User.objects.create_user(
+            username="student",
+            password="Password123!",
+        )
+        self.course = Course.objects.create(
+            title="Python",
+            instructor=self.instructor,
+        )
+        self.module = Module.objects.create(
+            course=self.course,
+            title="Basics",
+            order=1,
+        )
+        self.lesson = Lesson.objects.create(
+            module=self.module,
+            title="Variables",
+            notes="Read the examples",
+            video_url="https://example.com/variables",
+            order=2,
         )
 
-    def test_home_page_loads(self):
-        response = self.client.get(reverse("home"))
+    def test_owner_can_create_course_module_and_lesson(self):
+        self.client.force_login(self.instructor)
+        response = self.client.get(reverse("courses:course_create"))
         self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, "home.html")
 
-    def test_card_shows_title_instructor_and_price(self):
-        Course.objects.create(
-            title="Python for Beginners", instructor=self.omar,
-            price=Decimal("49"), is_published=True,
+        response = self.client.post(
+            reverse("courses:course_create"),
+            {"title": "Django"},
         )
-        response = self.client.get(reverse("home"))
-        self.assertContains(response, "Python for Beginners")
-        self.assertContains(response, "by Omar Ali")
-        self.assertContains(response, "$49.00")
+        course = Course.objects.get(title="Django")
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(course.instructor, self.instructor)
 
-    def test_instructor_without_full_name_shows_username(self):
-        sami = get_user_model().objects.create_user(username="sami", password="pass")
-        Course.objects.create(title="Cyber 101", instructor=sami, is_published=True)
-        response = self.client.get(reverse("home"))
-        self.assertContains(response, "by sami")
-
-    def test_zero_price_shows_free(self):
-        Course.objects.create(
-            title="Cyber 101", instructor=self.omar,
-            price=Decimal("0"), is_published=True,
+        response = self.client.get(
+            reverse("courses:module_create", args=[course.pk])
         )
-        response = self.client.get(reverse("home"))
-        self.assertContains(response, "Free")
+        self.assertEqual(response.status_code, 200)
 
-    def test_draft_courses_hidden(self):
-        Course.objects.create(title="Draft Course", instructor=self.omar, is_published=False)
-        response = self.client.get(reverse("home"))
-        self.assertNotContains(response, "Draft Course")
+        response = self.client.post(
+            reverse("courses:module_create", args=[course.pk]),
+            {"title": "First module", "order": 3},
+        )
+        module = Module.objects.get(course=course)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(module.order, 3)
 
-    def test_placeholder_when_no_thumbnail(self):
-        Course.objects.create(title="No Image", instructor=self.omar, is_published=True)
-        response = self.client.get(reverse("home"))
-        self.assertContains(response, "placehold.co")
+        response = self.client.get(
+            reverse("courses:lesson_create", args=[module.pk])
+        )
+        self.assertEqual(response.status_code, 200)
 
-    def test_limits_to_eight_courses(self):
-        for i in range(10):
-            Course.objects.create(title=f"Course {i}", instructor=self.omar, is_published=True)
-        response = self.client.get(reverse("home"))
-        self.assertEqual(len(response.context["courses"]), 8)
+        response = self.client.post(
+            reverse("courses:lesson_create", args=[module.pk]),
+            {
+                "title": "First lesson",
+                "notes": "Lesson notes",
+                "video_url": "https://example.com/video",
+                "order": 4,
+            },
+        )
+        lesson = Lesson.objects.get(module=module)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(lesson.title, "First lesson")
+        self.assertEqual(lesson.notes, "Lesson notes")
+        self.assertEqual(lesson.video_url, "https://example.com/video")
+        self.assertEqual(lesson.order, 4)
 
-    def test_empty_state(self):
-        response = self.client.get(reverse("home"))
-        self.assertContains(response, "No courses yet.")
+    def test_owner_can_edit_and_delete_module_and_lesson(self):
+        self.client.force_login(self.instructor)
+        response = self.client.post(
+            reverse("courses:module_update", args=[self.module.pk]),
+            {"title": "Updated module", "order": 5},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.module.refresh_from_db()
+        self.assertEqual((self.module.title, self.module.order), ("Updated module", 5))
+
+        response = self.client.post(
+            reverse("courses:lesson_update", args=[self.lesson.pk]),
+            {
+                "title": "Updated lesson",
+                "notes": "Updated notes",
+                "video_url": "https://example.com/updated",
+                "order": 6,
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.lesson.refresh_from_db()
+        self.assertEqual(self.lesson.title, "Updated lesson")
+        self.assertEqual(self.lesson.notes, "Updated notes")
+        self.assertEqual(self.lesson.video_url, "https://example.com/updated")
+        self.assertEqual(self.lesson.order, 6)
+
+        response = self.client.post(
+            reverse("courses:lesson_delete", args=[self.lesson.pk]),
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Lesson.objects.filter(pk=self.lesson.pk).exists())
+
+        response = self.client.post(
+            reverse("courses:module_delete", args=[self.module.pk]),
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Module.objects.filter(pk=self.module.pk).exists())
+
+    def test_foreign_instructor_cannot_edit_or_delete_module_or_lesson(self):
+        self.client.force_login(self.other_instructor)
+        for name, object_pk in (
+            ("courses:module_update", self.module.pk),
+            ("courses:lesson_update", self.lesson.pk),
+        ):
+            with self.subTest(name=name):
+                response = self.client.get(reverse(name, args=[object_pk]))
+                self.assertEqual(response.status_code, 404)
+
+        for name, object_pk in (
+            ("courses:module_delete", self.module.pk),
+            ("courses:lesson_delete", self.lesson.pk),
+        ):
+            with self.subTest(name=name):
+                response = self.client.post(reverse(name, args=[object_pk]))
+                self.assertEqual(response.status_code, 404)
+
+        self.assertTrue(Module.objects.filter(pk=self.module.pk).exists())
+        self.assertTrue(Lesson.objects.filter(pk=self.lesson.pk).exists())
+
+    def test_student_cannot_manage_curriculum(self):
+        self.client.force_login(self.student)
+        response = self.client.get(
+            reverse("courses:module_create", args=[self.course.pk])
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_modules_and_lessons_are_returned_in_order(self):
+        later_module = Module.objects.create(
+            course=self.course,
+            title="Advanced",
+            order=3,
+        )
+        earlier_lesson = Lesson.objects.create(
+            module=self.module,
+            title="Introduction",
+            order=1,
+        )
+        response = self.client.get(
+            reverse("courses:course_detail", args=[self.course.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(list(self.course.modules.all()), [self.module, later_module])
+        self.assertEqual(
+            list(self.module.lessons.all()),
+            [earlier_lesson, self.lesson],
+        )
+        self.assertLess(
+            response.content.index(b"Introduction"),
+            response.content.index(b"Variables"),
+        )
+
+    def test_create_forms_suggest_the_next_order(self):
+        self.client.force_login(self.instructor)
+        response = self.client.get(
+            reverse("courses:module_create", args=[self.course.pk])
+        )
+        self.assertContains(response, 'name="order" value="2"')
+
+        response = self.client.get(
+            reverse("courses:lesson_create", args=[self.module.pk])
+        )
+        self.assertContains(response, 'name="order" value="3"')
+
+    def test_module_creation_is_limited_to_course_owner(self):
+        self.client.force_login(self.other_instructor)
+        response = self.client.post(
+            reverse("courses:module_create", args=[self.course.pk]),
+            {"title": "Not allowed", "order": 0},
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(Module.objects.filter(title="Not allowed").exists())

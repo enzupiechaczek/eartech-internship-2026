@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}Courses | CourseHub{% endblock %}
+
+{% block content %}
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1>Courses</h1>
+        {% if user.is_authenticated and user.is_instructor %}
+            <a class="btn btn-primary" href="{% url 'courses:course_create' %}">Create course</a>
+        {% endif %}
+    </div>
+    {% if courses %}
+        <ul class="list-group">
+            {% for course in courses %}
+                <li class="list-group-item">
+                    <a href="{% url 'courses:course_detail' course.pk %}">{{ course.title }}</a>
+                    <span class="text-muted">by {{ course.instructor.username }}</span>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No courses have been created yet.</p>
+    {% endif %}
+{% endblock %}

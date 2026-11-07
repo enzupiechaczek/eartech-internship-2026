@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}{{ course.title }} | CourseHub{% endblock %}
+
+{% block content %}
+    <h1>{{ course.title }}</h1>
+    <p class="text-muted">Instructor: {{ course.instructor.username }}</p>
+    {% if user.is_authenticated and user == course.instructor %}
+        <a class="btn btn-primary mb-3" href="{% url 'courses:module_create' course.pk %}">Add module</a>
+    {% endif %}
+
+    {% for module in course.modules.all %}
+        <section class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h2 class="h5 mb-0">{{ module.title }}</h2>
+                {% if user.is_authenticated and user == course.instructor %}
+                    <div class="d-flex gap-2">
+                        <a class="btn btn-sm btn-outline-secondary" href="{% url 'courses:module_update' module.pk %}">Edit module</a>
+                        <form method="post" action="{% url 'courses:module_delete' module.pk %}">
+                            {% csrf_token %}
+                            <button class="btn btn-sm btn-outline-danger" type="submit">Delete module</button>
+                        </form>
+                    </div>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                <ol class="list-group list-group-numbered">
+                    {% for lesson in module.lessons.all %}
+                        <li class="list-group-item">
+                            <strong>{{ lesson.title }}</strong>
+                            {% if lesson.notes %}<p class="mb-1">{{ lesson.notes|linebreaksbr }}</p>{% endif %}
+                            {% if lesson.video_url %}
+                                <a href="{{ lesson.video_url }}" target="_blank" rel="noopener noreferrer">Watch lesson</a>
+                            {% endif %}
+                            {% if user.is_authenticated and user == course.instructor %}
+                                <div class="mt-2 d-flex gap-2">
+                                    <a class="btn btn-sm btn-outline-secondary" href="{% url 'courses:lesson_update' lesson.pk %}">Edit lesson</a>
+                                    <form method="post" action="{% url 'courses:lesson_delete' lesson.pk %}">
+                                        {% csrf_token %}
+                                        <button class="btn btn-sm btn-outline-danger" type="submit">Delete lesson</button>
+                                    </form>
+                                </div>
+                            {% endif %}
+                        </li>
+                    {% empty %}
+                        <li class="list-group-item">No lessons in this module yet.</li>
+                    {% endfor %}
+                </ol>
+                {% if user.is_authenticated and user == course.instructor %}
+                    <a class="btn btn-sm btn-primary mt-3" href="{% url 'courses:lesson_create' module.pk %}">Add lesson</a>
+                {% endif %}
+            </div>
+        </section>
+    {% empty %}
+        <p>No modules in this course yet.</p>
+    {% endfor %}
+{% endblock %}
