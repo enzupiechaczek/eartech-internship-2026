@@ -6,4 +6,9 @@ app_name = 'courses'
 
 urlpatterns = [
     path('', views.course_list, name='list'),
+    path(
+        '<int:course_id>/curriculum/',
+        views.course_curriculum,
+        name='curriculum'
+    ),
 ]

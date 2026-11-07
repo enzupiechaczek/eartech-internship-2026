@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}{{ course.title }} | Curriculum{% endblock %}
+
+{% block content %}
+
+<div class="container py-4">
+
+    <h2>{{ course.title }}</h2>
+    <h4 class="mt-4 mb-3">Course Curriculum</h4>
+
+    {% for module in modules %}
+
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    {{ module.order }}. {{ module.title }}
+                </h5>
+            </div>
+
+            <div class="card-body">
+
+                {% for lesson in module.lessons.all %}
+
+                    <div class="border-bottom py-2">
+                        {{ lesson.order }}. {{ lesson.title }}
+                    </div>
+
+                {% empty %}
+
+                    <p class="text-muted">
+                        No lessons added yet.
+                    </p>
+
+                {% endfor %}
+
+            </div>
+        </div>
+
+    {% empty %}
+
+        <p class="text-muted">
+            No modules added yet.
+        </p>
+
+    {% endfor %}
+
+</div>
+
+{% endblock %}
