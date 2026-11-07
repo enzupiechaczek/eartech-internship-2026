@@ -1,15 +1,18 @@
-from django.test import TestCase
-from django.urls import reverse
 from decimal import Decimal
+
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
-from .models import Course
+
+from .models import Course, Lesson
+
 
 class CourseListViewTests(TestCase):
     def test_course_list_page_loads(self):
         response = self.client.get(reverse('courses:list'))
         self.assertEqual(response.status_code, 200)
+
 
 class HomeViewTests(TestCase):
     def setUp(self):
@@ -68,3 +71,25 @@ class HomeViewTests(TestCase):
     def test_empty_state(self):
         response = self.client.get(reverse("home"))
         self.assertContains(response, "No courses yet.")
+
+
+class LessonVideoEmbedTests(TestCase):
+    def test_youtube_watch_url_is_converted_to_embed_url(self):
+        lesson = Lesson(video_url="https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+        self.assertEqual(lesson.embed, "https://www.youtube.com/embed/dQw4w9WgXcQ")
+
+    def test_youtube_short_url_is_converted_to_embed_url(self):
+        lesson = Lesson(video_url="https://youtu.be/dQw4w9WgXcQ?t=10")
+        self.assertEqual(lesson.embed, "https://www.youtube.com/embed/dQw4w9WgXcQ")
+
+    def test_vimeo_url_is_converted_to_embed_url(self):
+        lesson = Lesson(video_url="https://vimeo.com/123456789")
+        self.assertEqual(lesson.embed, "https://player.vimeo.com/video/123456789")
+
+    def test_blank_url_has_no_embed(self):
+        self.assertIsNone(Lesson(video_url="").embed)
+
+    def test_unsupported_video_url_fails_model_validation(self):
+        lesson = Lesson(video_url="https://example.com/video")
+        with self.assertRaises(ValidationError):
+            lesson.clean()
