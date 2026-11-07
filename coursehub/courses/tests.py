@@ -1,15 +1,21 @@
-from django.test import TestCase
-from django.urls import reverse
+
 from decimal import Decimal
+
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
+
+from .forms import validate_thumbnail_size
 from .models import Course
+
 
 class CourseListViewTests(TestCase):
     def test_course_list_page_loads(self):
         response = self.client.get(reverse('courses:list'))
         self.assertEqual(response.status_code, 200)
+
 
 class HomeViewTests(TestCase):
     def setUp(self):
@@ -68,3 +74,23 @@ class HomeViewTests(TestCase):
     def test_empty_state(self):
         response = self.client.get(reverse("home"))
         self.assertContains(response, "No courses yet.")
+
+
+class ThumbnailSizeValidationTests(TestCase):
+    def test_rejects_image_larger_than_2_mb(self):
+        image = SimpleUploadedFile(
+            "large.jpg",
+            b"x" * (2 * 1024 * 1024 + 1),
+            content_type="image/jpeg",
+        )
+
+        with self.assertRaises(ValidationError):
+            validate_thumbnail_size(image)
+
+    def test_accepts_image_smaller_than_2_mb(self):
+        image = SimpleUploadedFile(
+            "small.jpg",
+            b"x" * 1024,
+            content_type="image/jpeg",
+        )
+        self.assertIs(validate_thumbnail_size(image), image)
