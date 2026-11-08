@@ -24,6 +24,8 @@
                     {% if user.is_authenticated %}
                         {% if user.role == 'INSTRUCTOR' %}
                             <li class="nav-item">
+                                {% if lesson.embed %}<div class="ratio ratio-16x9"><iframe src="{{ lesson.embed }}" allowfullscreen></iframe></div>
+                                {% else %}<p class="text-danger">Video link is not valid.</p>{% endif %}
                                 <!-- TODO: real URL in Sprint 2/3 -->
                                 <a class="nav-link" href="#">Creator Studio</a>
                             </li>
