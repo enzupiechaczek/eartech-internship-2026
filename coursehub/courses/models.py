@@ -65,6 +65,14 @@ class Module(models.Model):
         return f"{self.course.title} - {self.title}"
 
 
+import re
+def embed_url(url):
+    m = re.search(r"(?:youtu\.be/|v=)([\w-]{11})", url)
+    if m: return f"https://www.youtube.com/embed/{m.group(1)}"
+    m = re.search(r"vimeo\.com/(\d+)", url)
+    if m: return f"https://player.vimeo.com/video/{m.group(1)}"
+    return None
+
 class Lesson(models.Model):
     module = models.ForeignKey(Module, on_delete=models.CASCADE, related_name='lessons')
     title = models.CharField(max_length=255)
