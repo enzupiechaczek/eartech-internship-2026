@@ -11,6 +11,6 @@ def home(request):
     courses = (
         Course.objects.filter(is_published=True)
         .select_related("instructor")
-        .order_by("-created_at")[:8]   
+        .order_by("-created_at")[:8]
     )
     return render(request, "home.html", {"courses": courses})

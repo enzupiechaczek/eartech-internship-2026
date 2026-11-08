@@ -58,15 +58,6 @@
     <!-- ===== Site Content ===== -->
     <main class="container site-main">
         {% block content %}{% endblock %}
-        {% if lesson %}
-            {% if lesson.embed %}
-                <div class="ratio ratio-16x9">
-                    <iframe src="{{ lesson.embed }}" title="{{ lesson.title }}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
-                </div>
-            {% else %}
-                <p class="text-danger">This video link isn’t valid. Please use a YouTube or Vimeo URL.</p>
-            {% endif %}
-        {% endif %}
     </main>
 
     <!-- ===== Footer ===== -->

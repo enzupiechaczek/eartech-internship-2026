@@ -1,11 +1,14 @@
+
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import Course, Lesson
+from .forms import validate_thumbnail_size
+from .models import Course
 
 
 class CourseListViewTests(TestCase):
@@ -73,23 +76,21 @@ class HomeViewTests(TestCase):
         self.assertContains(response, "No courses yet.")
 
 
-class LessonVideoEmbedTests(TestCase):
-    def test_youtube_watch_url_is_converted_to_embed_url(self):
-        lesson = Lesson(video_url="https://www.youtube.com/watch?v=dQw4w9WgXcQ")
-        self.assertEqual(lesson.embed, "https://www.youtube.com/embed/dQw4w9WgXcQ")
+class ThumbnailSizeValidationTests(TestCase):
+    def test_rejects_image_larger_than_2_mb(self):
+        image = SimpleUploadedFile(
+            "large.jpg",
+            b"x" * (2 * 1024 * 1024 + 1),
+            content_type="image/jpeg",
+        )
 
-    def test_youtube_short_url_is_converted_to_embed_url(self):
-        lesson = Lesson(video_url="https://youtu.be/dQw4w9WgXcQ?t=10")
-        self.assertEqual(lesson.embed, "https://www.youtube.com/embed/dQw4w9WgXcQ")
-
-    def test_vimeo_url_is_converted_to_embed_url(self):
-        lesson = Lesson(video_url="https://vimeo.com/123456789")
-        self.assertEqual(lesson.embed, "https://player.vimeo.com/video/123456789")
-
-    def test_blank_url_has_no_embed(self):
-        self.assertIsNone(Lesson(video_url="").embed)
-
-    def test_unsupported_video_url_fails_model_validation(self):
-        lesson = Lesson(video_url="https://example.com/video")
         with self.assertRaises(ValidationError):
-            lesson.clean()
+            validate_thumbnail_size(image)
+
+    def test_accepts_image_smaller_than_2_mb(self):
+        image = SimpleUploadedFile(
+            "small.jpg",
+            b"x" * 1024,
+            content_type="image/jpeg",
+        )
+        self.assertIs(validate_thumbnail_size(image), image)

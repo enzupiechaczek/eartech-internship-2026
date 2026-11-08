@@ -1,57 +1,32 @@
-import re
-from urllib.parse import parse_qs, urlsplit
 
 from django.conf import settings
-from django.core.exceptions import ValidationError
 from django.db import models
 
 
-def embed_url(url):
-    """Return a trusted YouTube/Vimeo embed URL, or None for unsupported links."""
-    if not url:
-        return None
+class Category(models.Model):
+    name = models.CharField(max_length=100, unique=True)
 
-    try:
-        parsed = urlsplit(url.strip())
-        host = (parsed.hostname or "").lower()
-    except (AttributeError, ValueError):
-        return None
+    class Meta:
+        verbose_name_plural = "categories"
 
-    if parsed.scheme not in {"http", "https"}:
-        return None
-
-    path_parts = parsed.path.strip("/").split("/")
-
-    if host in {"youtu.be", "www.youtu.be"}:
-        video_id = path_parts[0] if path_parts else ""
-    elif host in {"youtube.com", "www.youtube.com", "m.youtube.com"}:
-        if parsed.path == "/watch":
-            video_id = parse_qs(parsed.query).get("v", [""])[0]
-        elif len(path_parts) == 2 and path_parts[0] in {"embed", "shorts", "live"}:
-            video_id = path_parts[1]
-        else:
-            video_id = ""
-    elif host in {"vimeo.com", "www.vimeo.com"}:
-        video_id = path_parts[0] if path_parts else ""
-        if re.fullmatch(r"\d+", video_id):
-            return f"https://player.vimeo.com/video/{video_id}"
-        return None
-    elif host == "player.vimeo.com":
-        video_id = path_parts[1] if len(path_parts) == 2 and path_parts[0] == "video" else ""
-        if re.fullmatch(r"\d+", video_id):
-            return f"https://player.vimeo.com/video/{video_id}"
-        return None
-    else:
-        return None
-
-    if re.fullmatch(r"[\w-]{11}", video_id):
-        return f"https://www.youtube.com/embed/{video_id}"
-
-    return None
+    def __str__(self):
+        return self.name
 
 
 class Course(models.Model):
     title = models.CharField(max_length=200)
+
+    subtitle = models.CharField(max_length=250, blank=True)
+
+    description = models.TextField()
+
+    category = models.ForeignKey(
+        Category,
+        on_delete=models.PROTECT,
+        related_name="courses",
+        null=True,
+        blank=True,
+    )
 
     instructor = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -76,8 +51,8 @@ class Course(models.Model):
 
     def __str__(self):
         return self.title
-
-
+    
+    
 class Module(models.Model):
     course = models.ForeignKey('Course', on_delete=models.CASCADE, related_name='modules')
     title = models.CharField(max_length=255)
@@ -102,14 +77,3 @@ class Lesson(models.Model):
 
     def __str__(self):
         return f"{self.module.title} - {self.title}"
-
-    def clean(self):
-        super().clean()
-        if self.video_url and not embed_url(self.video_url):
-            raise ValidationError({
-                "video_url": "Enter a valid YouTube or Vimeo video URL."
-            })
-
-    @property
-    def embed(self):
-        return embed_url(self.video_url)
