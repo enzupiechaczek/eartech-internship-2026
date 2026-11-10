@@ -1,4 +1,3 @@
-
 from django import forms
 from django.core.exceptions import ValidationError
 
@@ -17,7 +16,14 @@ def validate_thumbnail_size(image):
 class CourseForm(forms.ModelForm):
     class Meta:
         model = Course
-        fields = ["title", "price", "thumbnail", "status"]
+        fields = [
+            "title",
+            "subtitle",
+            "category",
+            "price",
+            "description",
+            "thumbnail",
+        ]
 
     def clean_thumbnail(self):
         return validate_thumbnail_size(

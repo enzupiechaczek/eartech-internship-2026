@@ -24,8 +24,7 @@
                     {% if user.is_authenticated %}
                         {% if user.role == 'INSTRUCTOR' %}
                             <li class="nav-item">
-                                <!-- TODO: real URL in Sprint 2/3 -->
-                                <a class="nav-link" href="#">Creator Studio</a>
+                                <a class="nav-link" href="{% url 'studio' %}">Creator Studio</a>
                             </li>
                         {% elif user.role == 'STUDENT' %}
                             <li class="nav-item">
