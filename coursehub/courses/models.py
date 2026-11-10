@@ -1,4 +1,3 @@
-
 from django.conf import settings
 from django.db import models
 
@@ -45,7 +44,21 @@ class Course(models.Model):
         blank=True,
     )
 
-    is_published = models.BooleanField(default=False)
+    class Status(models.TextChoices):
+        DRAFT = "DRAFT", "Draft"
+        PUBLISHED = "PUBLISHED", "Published"
+
+    status = models.CharField(
+        max_length=10,
+        choices=Status.choices,
+        default=Status.DRAFT,
+    )
+
+    students = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        through='enrollments.Enrollment',
+        related_name='enrolled_courses'
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
 

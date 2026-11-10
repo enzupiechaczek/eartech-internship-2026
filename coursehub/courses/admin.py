@@ -10,8 +10,8 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Course)
 class CourseAdmin(admin.ModelAdmin):
-    list_display = ("title", "category", "instructor", "price", "is_published", "created_at")
-    list_filter = ("is_published", "category")
+    list_display = ("title", "category", "instructor", "price", "status", "created_at")
+    list_filter = ("status", "category")
     search_fields = ("title", "instructor__username")
 
 @admin.register(Module)

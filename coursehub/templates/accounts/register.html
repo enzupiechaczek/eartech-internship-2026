@@ -1,19 +1,67 @@
 {% extends "base.html" %}
 
+{% block title %}Create an account | CourseHub{% endblock %}
+
 {% block content %}
+<div class="auth-page">
+    <div class="auth-card">
 
-<div class="container mt-5">
-    <h2>Create an Account</h2>
+        <aside class="auth-aside">
+            <div>
+                <a class="auth-brand" href="{% url 'home' %}">CourseHub</a>
+                <h2 class="auth-aside-title">Start learning<br>today.</h2>
+                <p class="auth-aside-text">
+                    Join as a student to learn, or as an instructor to share
+                    what you know.
+                </p>
+            </div>
+            <ul class="auth-list">
+                <li>Learn at your own pace</li>
+                <li>Create and publish your own courses</li>
+                <li>Everything in one place</li>
+            </ul>
+        </aside>
 
-    <form method="POST">
-        {% csrf_token %}
+        <section class="auth-panel">
+            <span class="auth-eyebrow">Get started</span>
+            <h1 class="auth-title">Create your account</h1>
+            <p class="auth-subtitle">It only takes a minute.</p>
 
-        {{ form.as_p }}
+            <form method="post" class="auth-form" novalidate>
+                {% csrf_token %}
 
-        <button type="submit" class="btn btn-primary">
-            Register
-        </button>
-    </form>
+                {% if form.non_field_errors %}
+                    <div class="auth-alert" role="alert">
+                        {% for error in form.non_field_errors %}
+                            <div>{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+
+                {% for field in form %}
+                    <div class="auth-field{% if field.errors %} has-error{% endif %}">
+                        <label for="{{ field.id_for_label }}">
+                            {{ field.label }}{% if field.field.required %}<span class="auth-req" aria-hidden="true">*</span>{% endif %}
+                        </label>
+                        {{ field }}
+                        {% if field.help_text %}
+                            <div class="auth-help">{{ field.help_text|safe }}</div>
+                        {% endif %}
+                        {% for error in field.errors %}
+                            <div class="auth-error">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+
+                <button type="submit" class="auth-submit">Create account</button>
+            </form>
+
+            <p class="auth-switch">
+                Already have an account?
+                <a href="{% url 'login' %}">Log in</a>
+            </p>
+        </section>
+
+    </div>
 </div>
-
 {% endblock %}
