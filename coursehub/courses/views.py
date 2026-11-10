@@ -49,7 +49,7 @@ class CourseUpdateView(InstructorRequiredMixin, CourseFormMixin, UpdateView):
 
 
 def course_list(request):
-    return HttpResponse('Courses app is working.')
+    return HttpResponse('Courses app is working ✅')
 
 
 def home(request):
@@ -59,6 +59,10 @@ def home(request):
         .order_by("-created_at")[:8]
     )
     return render(request, "home.html", {"courses": courses})
+
+
+def about(request):
+    return render(request, "about.html")
 
 
 @instructor_required
@@ -233,6 +237,8 @@ def lesson_delete(request, lesson_id):
             "cancel_url": reverse("courses:curriculum", args=[lesson.module.course_id]),
         },
     )
+
+
 @instructor_required
 @require_POST
 def toggle_publish(request, pk):

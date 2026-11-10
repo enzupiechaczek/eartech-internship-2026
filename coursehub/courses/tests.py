@@ -9,8 +9,21 @@ from django.test import TestCase
 from django.urls import reverse
 from PIL import Image
 
+
 from .forms import MAX_THUMBNAIL_SIZE, validate_thumbnail_size
 from .models import Category, Course, Module, Lesson
+
+
+class AboutPageTests(TestCase):
+    def test_about_page_status_code_and_template(self):
+        url = reverse("about")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "about.html")
+        self.assertContains(response, 'href="/about/"')
+
+
 class CourseListViewTests(TestCase):
     def test_course_list_page_loads(self):
         response = self.client.get(reverse('courses:list'))
