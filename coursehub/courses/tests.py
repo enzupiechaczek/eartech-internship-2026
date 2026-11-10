@@ -33,7 +33,7 @@ class HomeViewTests(TestCase):
     def test_card_shows_title_instructor_and_price(self):
         Course.objects.create(
             title="Python for Beginners", instructor=self.omar,
-            price=Decimal("49"), is_published=True,
+            price=Decimal("49"), status="PUBLISHED",
         )
         response = self.client.get(reverse("home"))
         self.assertContains(response, "Python for Beginners")
@@ -42,31 +42,31 @@ class HomeViewTests(TestCase):
 
     def test_instructor_without_full_name_shows_username(self):
         sami = get_user_model().objects.create_user(username="sami", password="pass")
-        Course.objects.create(title="Cyber 101", instructor=sami, is_published=True)
+        Course.objects.create(title="Cyber 101", instructor=sami, status="PUBLISHED")
         response = self.client.get(reverse("home"))
         self.assertContains(response, "by sami")
 
     def test_zero_price_shows_free(self):
         Course.objects.create(
             title="Cyber 101", instructor=self.omar,
-            price=Decimal("0"), is_published=True,
+            price=Decimal("0"), status="PUBLISHED",
         )
         response = self.client.get(reverse("home"))
         self.assertContains(response, "Free")
 
     def test_draft_courses_hidden(self):
-        Course.objects.create(title="Draft Course", instructor=self.omar, is_published=False)
+        Course.objects.create(title="Draft Course", instructor=self.omar, status="DRAFT")
         response = self.client.get(reverse("home"))
         self.assertNotContains(response, "Draft Course")
 
     def test_placeholder_when_no_thumbnail(self):
-        Course.objects.create(title="No Image", instructor=self.omar, is_published=True)
+        Course.objects.create(title="No Image", instructor=self.omar, status="PUBLISHED")
         response = self.client.get(reverse("home"))
         self.assertContains(response, "placehold.co")
 
     def test_limits_to_eight_courses(self):
         for i in range(10):
-            Course.objects.create(title=f"Course {i}", instructor=self.omar, is_published=True)
+            Course.objects.create(title=f"Course {i}", instructor=self.omar, status="PUBLISHED")
         response = self.client.get(reverse("home"))
         self.assertEqual(len(response.context["courses"]), 8)
 
@@ -96,7 +96,7 @@ class CourseCurriculumTests(TestCase):
         self.course = Course.objects.create(
             title="Python for Beginners",
             instructor=self.instructor,
-            is_published=True,
+            status=Course.Status.PUBLISHED,
         )
 
         self.module = Module.objects.create(
@@ -528,7 +528,7 @@ class CourseCreateUpdateTests(TestCase):
         self.assertEqual(course.instructor, self.instructor)
         self.assertEqual(course.category, self.category)
         self.assertEqual(course.subtitle, "Build your first web app")
-        self.assertFalse(course.is_published)
+        self.assertNotEqual(course.status, "PUBLISHED")
 
     def test_create_sets_owner_and_ignores_posted_instructor(self):
         self.login("lina")
@@ -714,3 +714,50 @@ class ThumbnailSizeValidationTests(TestCase):
             content_type="image/jpeg",
         )
         self.assertIs(validate_thumbnail_size(image), image)
+
+
+class TogglePublishTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.teacher = User.objects.create_user(
+            username="teach", password="pass", role="INSTRUCTOR"
+        )
+        self.course = Course.objects.create(title="Django Web", instructor=self.teacher)
+        self.url = reverse("courses:toggle_publish", args=[self.course.pk])
+
+    def test_publish_then_unpublish(self):
+        self.client.login(username="teach", password="pass")
+        self.client.post(self.url)
+        self.course.refresh_from_db()
+        self.assertEqual(self.course.status, "PUBLISHED")
+        self.client.post(self.url)
+        self.course.refresh_from_db()
+        self.assertEqual(self.course.status, "DRAFT")
+
+    def test_other_instructor_cannot_toggle(self):
+        get_user_model().objects.create_user(
+            username="other", password="pass", role="INSTRUCTOR"
+        )
+        self.client.login(username="other", password="pass")
+        response = self.client.post(self.url)
+        self.assertEqual(response.status_code, 404)
+
+    def test_get_not_allowed(self):
+        self.client.login(username="teach", password="pass")
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 405)
+
+    def test_anonymous_redirected_to_login(self):
+        response = self.client.post(self.url)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("login", response.url)
+
+    def test_student_forbidden(self):
+        get_user_model().objects.create_user(
+            username="stud", password="pass", role="STUDENT"
+        )
+        self.client.login(username="stud", password="pass")
+        response = self.client.post(self.url)
+        self.assertEqual(response.status_code, 403)
+        self.course.refresh_from_db()
+        self.assertEqual(self.course.status, "DRAFT")

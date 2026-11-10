@@ -3,10 +3,9 @@ from django.contrib import messages
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
+from django.views.decorators.http import require_POST
 from django.views.generic.edit import CreateView, UpdateView
-
 from accounts.decorators import InstructorRequiredMixin, instructor_required
-
 from .forms import CourseForm, LessonForm, ModuleForm
 from .models import Course, Lesson, Module
 
@@ -55,7 +54,7 @@ def course_list(request):
 
 def home(request):
     courses = (
-        Course.objects.filter(is_published=True)
+        Course.objects.filter(status=Course.Status.PUBLISHED)
         .select_related("instructor")
         .order_by("-created_at")[:8]
     )
@@ -234,3 +233,13 @@ def lesson_delete(request, lesson_id):
             "cancel_url": reverse("courses:curriculum", args=[lesson.module.course_id]),
         },
     )
+@instructor_required
+@require_POST
+def toggle_publish(request, pk):
+    course = get_object_or_404(Course, pk=pk, instructor=request.user)
+    if course.status == Course.Status.PUBLISHED:
+        course.status = Course.Status.DRAFT
+    else:
+        course.status = Course.Status.PUBLISHED
+    course.save(update_fields=["status"])
+    return redirect("studio")

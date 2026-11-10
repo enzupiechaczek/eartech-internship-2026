@@ -19,7 +19,7 @@
         </div>
     </div>
 
-    {% if not course.is_published %}
+      {% if course.status != "PUBLISHED" %}
         <div class="alert alert-warning">
             This course is still a draft. Only you can see it.
         </div>

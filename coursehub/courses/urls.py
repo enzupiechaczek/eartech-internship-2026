@@ -1,5 +1,4 @@
 from django.urls import path
-
 from . import views
 
 app_name = 'courses'
@@ -10,6 +9,11 @@ urlpatterns = [
     # Course Create and Edit
     path('new/', views.CourseCreateView.as_view(), name='course_create'),
     path('<int:pk>/edit/', views.CourseUpdateView.as_view(), name='course_update'),
+    path(
+        '<int:pk>/toggle-publish/',
+        views.toggle_publish,
+        name='toggle_publish',
+    ),
 
     # Curriculum
     path(
