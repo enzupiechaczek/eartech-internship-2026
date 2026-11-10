@@ -14,17 +14,19 @@ from .forms import MAX_THUMBNAIL_SIZE, validate_thumbnail_size
 from .models import Category, Course
 
 class AboutPageTests(TestCase):
-    def test_about_page_returns_200(self):
-        response = self.client.get(reverse('about'))
+    def test_about_page_status_code_and_template(self):
+        url = reverse('about')
+        response = self.client.get(url)
+        
+        # 1. Check if the status code is 200 (OK)
         self.assertEqual(response.status_code, 200)
-
-    def test_about_page_uses_template(self):
-        response = self.client.get(reverse('about'))
+        
+        # 2. Check if the correct template is used
         self.assertTemplateUsed(response, 'about.html')
+        
+        # 3. Check if the About link is in the navbar
+        self.assertContains(response, 'href="/about/"')
 
-    def test_navbar_contains_about_link(self):
-        response = self.client.get(reverse('about'))
-        self.assertContains(response, f'href="{reverse("about")}"')
 
 class CourseListViewTests(TestCase):
     def test_course_list_page_loads(self):
