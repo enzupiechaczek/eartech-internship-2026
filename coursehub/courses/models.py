@@ -43,9 +43,9 @@ def embed_url(url):
 
 def parsed_urlity_query_value(query, key):
     """Get a query-string value without accepting a URL from another host."""
-    from urllib.parse import parse_qs
+    from urllib.parse import parse_qs as parse_queries
 
-    return parse_qs(query).get(key, [None])[0]
+    return parse_queries(query).get(key, [None])[0]
 
 
 class Category(models.Model):
