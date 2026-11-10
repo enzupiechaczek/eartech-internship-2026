@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}{% if module %}Edit module{% else %}Add module{% endif %} | {{ course.title }}{% endblock %}
+
+{% block content %}
+
+<div class="container py-4" style="max-width: 720px;">
+
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a href="{% url 'courses:curriculum' course.id %}">{{ course.title }}</a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">
+                {% if module %}Edit module{% else %}Add module{% endif %}
+            </li>
+        </ol>
+    </nav>
+
+    <h2 class="mb-4">{% if module %}Edit module{% else %}Add module{% endif %}</h2>
+
+    <form method="post" class="card card-body">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+            <div class="alert alert-danger">
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
+
+        {% for field in form %}
+            <div class="mb-3">
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}
+                    <div class="form-text">{{ field.help_text }}</div>
+                {% endif %}
+                {% for error in field.errors %}
+                    <div class="text-danger small">{{ error }}</div>
+                {% endfor %}
+            </div>
+        {% endfor %}
+
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">
+                {% if module %}Save changes{% else %}Add module{% endif %}
+            </button>
+            <a class="btn btn-outline-secondary"
+               href="{% url 'courses:curriculum' course.id %}">
+                Cancel
+            </a>
+        </div>
+    </form>
+
+</div>
+
+{% endblock %}
