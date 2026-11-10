@@ -23,7 +23,6 @@ class CourseForm(forms.ModelForm):
             "price",
             "description",
             "thumbnail",
-            "is_published",
         ]
 
     def clean_thumbnail(self):

@@ -49,7 +49,7 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if course.is_published %}
+                                    {% if course.status == "PUBLISHED" %}
                                         <span class="badge bg-success">Published</span>
                                     {% else %}
                                         <span class="badge bg-secondary">Draft</span>
@@ -61,6 +61,16 @@
                                        href="{% url 'courses:course_update' course.pk %}">
                                         Edit
                                     </a>
+                                    <form method="post"
+                                          action="{% url 'courses:toggle_publish' course.pk %}"
+                                          class="d-inline">
+                                        {% csrf_token %}
+                                        {% if course.status == "PUBLISHED" %}
+                                            <button type="submit" class="btn btn-sm btn-outline-warning">Unpublish</button>
+                                        {% else %}
+                                            <button type="submit" class="btn btn-sm btn-success">Publish</button>
+                                        {% endif %}
+                                    </form>
                                 </td>
                             </tr>
                         {% endfor %}
