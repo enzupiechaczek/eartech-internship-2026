@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.urls import path
 from . import views
+from appointments import views as appointment_views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -19,4 +20,7 @@ urlpatterns = [
     path('redirect/', views.home_redirect, name='home_redirect'),
     path('doctor/dashboard/', views.doctor_dashboard, name='doctor_dashboard'),
     path('patient/dashboard/', views.patient_dashboard, name='patient_dashboard'),
+
+    # Doctor request management
+    path('doctor/requests/', appointment_views.pending_requests, name='pending_requests'),
 ]
