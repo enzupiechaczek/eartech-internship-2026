@@ -1,3 +1,4 @@
+
 {% extends "base.html" %}
 
 {% block title %}CourseHub | Learn from real instructors{% endblock %}
@@ -58,13 +59,37 @@
                 </div>
 
                 <div class="home-card-body">
-                    <h3 class="home-card-title">{{ c.title }}</h3>
+                    <h3 class="home-card-title">
+                        <a href="{% url 'courses:detail' c.pk %}">
+                            {{ c.title }}
+                        </a>
+                    </h3>
+
                     {% if c.subtitle %}
                         <p class="home-card-sub">{{ c.subtitle|truncatechars:90 }}</p>
                     {% endif %}
+
                     <p class="home-card-meta">
                         by {{ c.instructor.get_full_name|default:c.instructor.username }}
                     </p>
+
+                    <div class="course-rating">
+                        {% if c.average_rating %}
+                            <span
+                                class="course-rating-stars"
+                                aria-label="Rated {{ c.average_rating|floatformat:1 }} out of 5">
+                                ★★★★★
+                            </span>
+                            <span class="course-rating-score">
+                                {{ c.average_rating|floatformat:1 }}/5
+                            </span>
+                            <span class="course-rating-count">
+                                ({{ c.reviews.count }} reviews)
+                            </span>
+                        {% else %}
+                            <span class="course-rating-empty">No reviews yet</span>
+                        {% endif %}
+                    </div>
                 </div>
 
                 <div class="home-card-foot">
