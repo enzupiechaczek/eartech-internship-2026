@@ -1,4 +1,3 @@
-
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -8,7 +7,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from .forms import validate_thumbnail_size
-from .models import Course
+from .models import Course, Lesson, Module, embed_url
 
 
 class CourseListViewTests(TestCase):
@@ -94,3 +93,36 @@ class ThumbnailSizeValidationTests(TestCase):
             content_type="image/jpeg",
         )
         self.assertIs(validate_thumbnail_size(image), image)
+
+
+class LessonVideoEmbedTests(TestCase):
+    def test_youtube_watch_url(self):
+        self.assertEqual(
+            embed_url("https://www.youtube.com/watch?v=dQw4w9WgXcQ"),
+            "https://www.youtube.com/embed/dQw4w9WgXcQ",
+        )
+
+    def test_youtu_be_url(self):
+        self.assertEqual(
+            embed_url("https://youtu.be/dQw4w9WgXcQ"),
+            "https://www.youtube.com/embed/dQw4w9WgXcQ",
+        )
+
+    def test_vimeo_url(self):
+        self.assertEqual(
+            embed_url("https://vimeo.com/123456789"),
+            "https://player.vimeo.com/video/123456789",
+        )
+
+    def test_invalid_or_empty_url_returns_none(self):
+        self.assertIsNone(embed_url("https://example.com/watch?v=dQw4w9WgXcQ"))
+        self.assertIsNone(embed_url(""))
+
+    def test_lesson_embed_property_uses_helper(self):
+        lesson = Lesson(video_url="https://youtu.be/dQw4w9WgXcQ")
+        self.assertEqual(lesson.embed, "https://www.youtube.com/embed/dQw4w9WgXcQ")
+
+
+def _placeholder_to_keep_imports_used():
+    # Module is used by tests in the curriculum integration change.
+    return Module
