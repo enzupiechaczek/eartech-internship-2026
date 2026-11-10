@@ -27,7 +27,7 @@ def home(request):
 class CourseDetailView(LoginRequiredMixin, DetailView):
     model = Course
     template_name = "courses/course_detail.html"  # Your template path
-    context_object_name = "courses"
+    context_object_name = "course"
 
     def get_queryset(self):
         # Restricts visibility: Instructors can only view their own courses
