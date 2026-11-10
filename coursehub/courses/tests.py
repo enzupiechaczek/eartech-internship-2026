@@ -13,6 +13,20 @@ from PIL import Image
 from .forms import MAX_THUMBNAIL_SIZE, validate_thumbnail_size
 from .models import Category, Course
 
+class AboutPageTests(TestCase):
+    def test_about_page_status_code_and_template(self):
+        url = reverse('about')
+        response = self.client.get(url)
+        
+        # 1. Check if the status code is 200 (OK)
+        self.assertEqual(response.status_code, 200)
+        
+        # 2. Check if the correct template is used
+        self.assertTemplateUsed(response, 'about.html')
+        
+        # 3. Check if the About link is in the navbar
+        self.assertContains(response, 'href="/about/"')
+
 
 class CourseListViewTests(TestCase):
     def test_course_list_page_loads(self):

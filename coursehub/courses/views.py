@@ -60,6 +60,10 @@ def home(request):
     return render(request, "home.html", {"courses": courses})
 
 
+def about(request):
+    return render(request, "about.html")
+
+
 @instructor_required
 def studio(request):
     courses = (
