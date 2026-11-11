@@ -88,6 +88,151 @@ class HomeViewTests(TestCase):
         self.assertContains(response, "No courses yet.")
 
 
+class PublicCourseOutlineTests(TestCase):
+    """The public curriculum outline for a published course (AB#3313)."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.instructor = User.objects.create_user(
+            username="lina",
+            password="pass",
+            role="INSTRUCTOR",
+            first_name="Lina",
+            last_name="Haddad",
+        )
+        self.course = Course.objects.create(
+            title="Django for Beginners",
+            subtitle="Build your first web app",
+            description="A beginner friendly Django course.",
+            instructor=self.instructor,
+            status=Course.Status.PUBLISHED,
+        )
+        self.second_module = Module.objects.create(
+            course=self.course, title="Models and data", order=2
+        )
+        self.first_module = Module.objects.create(
+            course=self.course, title="Getting started", order=1
+        )
+        self.second_lesson = Lesson.objects.create(
+            module=self.first_module, title="Install Django", order=2
+        )
+        self.first_lesson = Lesson.objects.create(
+            module=self.first_module, title="Meet Django", order=1
+        )
+
+    def outline_url(self, course=None):
+        return reverse("courses:outline", args=[(course or self.course).pk])
+
+    # ----- public access --------------------------------------------------
+
+    def test_guest_can_view_published_outline(self):
+        response = self.client.get(self.outline_url())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "courses/course_outline.html")
+        self.assertContains(response, "Django for Beginners")
+        self.assertContains(response, "Build your first web app")
+        self.assertContains(response, "Lina Haddad")
+        self.assertContains(response, "Getting started")
+        self.assertContains(response, "Models and data")
+        self.assertContains(response, "Meet Django")
+        self.assertContains(response, "Install Django")
+
+    def test_outline_shows_module_and_lesson_totals(self):
+        response = self.client.get(self.outline_url())
+
+        self.assertEqual(response.context["lesson_count"], 2)
+        self.assertContains(response, "2 modules")
+        self.assertContains(response, "2 lessons")
+
+    def test_modules_and_lessons_are_ordered(self):
+        content = self.client.get(self.outline_url()).content.decode()
+
+        self.assertLess(
+            content.index("Getting started"), content.index("Models and data")
+        )
+        self.assertLess(content.index("Meet Django"), content.index("Install Django"))
+
+    def test_unknown_course_returns_404(self):
+        response = self.client.get(
+            reverse("courses:outline", args=[99999])
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    # ----- draft courses stay private ------------------------------------
+
+    def test_draft_course_returns_404_for_guest(self):
+        draft = Course.objects.create(
+            title="Secret draft",
+            instructor=self.instructor,
+            status=Course.Status.DRAFT,
+        )
+
+        response = self.client.get(self.outline_url(draft))
+
+        self.assertEqual(response.status_code, 404)
+        self.assertNotContains(response, "Secret draft", status_code=404)
+
+    def test_draft_course_returns_404_for_instructor(self):
+        draft = Course.objects.create(
+            title="Secret draft",
+            instructor=self.instructor,
+            status=Course.Status.DRAFT,
+        )
+        self.client.login(username="lina", password="pass")
+
+        response = self.client.get(self.outline_url(draft))
+
+        self.assertEqual(response.status_code, 404)
+
+    # ----- read-only ------------------------------------------------------
+
+    def test_outline_has_no_instructor_edit_controls(self):
+        self.client.login(username="lina", password="pass")
+        response = self.client.get(self.outline_url())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "+ Add Module")
+        self.assertNotContains(response, "+ Lesson")
+        self.assertNotContains(
+            response, reverse("courses:module_create", args=[self.course.pk])
+        )
+        self.assertNotContains(
+            response, reverse("courses:module_edit", args=[self.first_module.pk])
+        )
+        self.assertNotContains(
+            response, reverse("courses:module_delete", args=[self.first_module.pk])
+        )
+        self.assertNotContains(
+            response, reverse("courses:lesson_create", args=[self.first_module.pk])
+        )
+        self.assertNotContains(
+            response, reverse("courses:lesson_edit", args=[self.first_lesson.pk])
+        )
+        self.assertNotContains(
+            response, reverse("courses:lesson_delete", args=[self.first_lesson.pk])
+        )
+
+    def test_empty_outline_has_a_friendly_message(self):
+        empty_course = Course.objects.create(
+            title="Fresh course",
+            instructor=self.instructor,
+            status=Course.Status.PUBLISHED,
+        )
+
+        response = self.client.get(self.outline_url(empty_course))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "This course is published but its outline is still being built.")
+
+    # ----- entry point ----------------------------------------------------
+
+    def test_home_cards_link_to_the_outline(self):
+        response = self.client.get(reverse("home"))
+
+        self.assertContains(response, self.outline_url())
+
 
 class CourseCurriculumTests(TestCase):
 

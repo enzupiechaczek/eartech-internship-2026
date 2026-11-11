@@ -52,6 +52,26 @@ def course_list(request):
     return HttpResponse('Courses app is working ✅')
 
 
+def course_outline(request, pk):
+    """Public, read-only curriculum outline for a published course."""
+    course = get_object_or_404(
+        Course.objects.select_related("instructor", "category"),
+        pk=pk,
+        status=Course.Status.PUBLISHED,
+    )
+    modules = course.modules.prefetch_related("lessons").all()
+
+    return render(
+        request,
+        "courses/course_outline.html",
+        {
+            "course": course,
+            "modules": modules,
+            "lesson_count": sum(len(module.lessons.all()) for module in modules),
+        },
+    )
+
+
 def home(request):
     courses = (
         Course.objects.filter(status=Course.Status.PUBLISHED)
