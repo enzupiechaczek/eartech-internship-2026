@@ -19,8 +19,6 @@ def embed_url(video_url):
         return None
 
     if host in {"youtube.com", "m.youtube.com"} or host.endswith(".youtube.com"):
-        if parsed.netloc.lower().endswith("youtu.be"):
-            host = "youtu.be"
         video_id = parse_qs(parsed.query).get("v", [None])[0]
         if not video_id:
             video_id = parsed.path.strip("/").split("/embed/")[-1].split("/")[0]

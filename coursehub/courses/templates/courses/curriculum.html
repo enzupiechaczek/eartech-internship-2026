@@ -66,6 +66,16 @@
                         </div>
                     </div>
 
+                    {% if lesson.video_url %}
+                        {% if lesson.embed %}
+                            <div class="ratio ratio-16x9 mt-3">
+                                <iframe src="{{ lesson.embed }}" title="{{ lesson.title }}" allowfullscreen></iframe>
+                            </div>
+                        {% else %}
+                            <p class="text-warning small mt-2 mb-0">Video link is not valid</p>
+                        {% endif %}
+                    {% endif %}
+
                 {% empty %}
 
                     <p class="text-muted mb-0">

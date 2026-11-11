@@ -11,7 +11,84 @@ from PIL import Image
 
 
 from .forms import MAX_THUMBNAIL_SIZE, validate_thumbnail_size
-from .models import Category, Course, Module, Lesson
+from .models import Category, Course, Module, Lesson, embed_url
+
+
+class LessonEmbedUrlTests(TestCase):
+    def test_youtube_watch_url(self):
+        self.assertEqual(
+            embed_url("https://www.youtube.com/watch?v=dQw4w9WgXcQ"),
+            "https://www.youtube.com/embed/dQw4w9WgXcQ",
+        )
+
+    def test_youtu_be_url(self):
+        self.assertEqual(
+            embed_url("https://youtu.be/dQw4w9WgXcQ"),
+            "https://www.youtube.com/embed/dQw4w9WgXcQ",
+        )
+
+    def test_vimeo_url(self):
+        self.assertEqual(
+            embed_url("https://vimeo.com/123456789"),
+            "https://player.vimeo.com/video/123456789",
+        )
+
+    def test_invalid_url_returns_none(self):
+        self.assertIsNone(embed_url("https://example.com/not-a-video"))
+
+    def test_curriculum_shows_embed_for_valid_video(self):
+        User = get_user_model()
+        instructor = User.objects.create_user(
+            username="owner",
+            password="testpass123",
+            role="INSTRUCTOR",
+        )
+        course = Course.objects.create(
+            title="Django for Beginners",
+            instructor=instructor,
+            status=Course.Status.PUBLISHED,
+        )
+        module = Module.objects.create(course=course, title="Intro", order=1)
+        Lesson.objects.create(
+            module=module,
+            title="Lesson 1",
+            notes="Intro notes",
+            video_url="https://youtu.be/dQw4w9WgXcQ",
+            order=1,
+        )
+
+        self.client.login(username="owner", password="testpass123")
+        response = self.client.get(reverse("courses:curriculum", args=[course.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "https://www.youtube.com/embed/dQw4w9WgXcQ")
+        self.assertContains(response, "<iframe")
+
+    def test_curriculum_shows_friendly_message_for_invalid_video(self):
+        User = get_user_model()
+        instructor = User.objects.create_user(
+            username="owner2",
+            password="testpass123",
+            role="INSTRUCTOR",
+        )
+        course = Course.objects.create(
+            title="Invalid Video Course",
+            instructor=instructor,
+            status=Course.Status.PUBLISHED,
+        )
+        module = Module.objects.create(course=course, title="Intro", order=1)
+        Lesson.objects.create(
+            module=module,
+            title="Broken Lesson",
+            notes="Oops",
+            video_url="https://example.com/not-a-video",
+            order=1,
+        )
+
+        self.client.login(username="owner2", password="testpass123")
+        response = self.client.get(reverse("courses:curriculum", args=[course.id]))
+
+        self.assertContains(response, "Video link is not valid")
 
 
 class AboutPageTests(TestCase):
@@ -87,7 +164,6 @@ class HomeViewTests(TestCase):
     def test_empty_state(self):
         response = self.client.get(reverse("home"))
         self.assertContains(response, "No courses yet.")
-
 
 
 class CourseCurriculumTests(TestCase):
@@ -202,8 +278,6 @@ class CurriculumCrudTests(TestCase):
     def login_student(self):
         self.client.login(username="student", password="testpass123")
 
-    # ----- curriculum page ------------------------------------------------
-
     def test_curriculum_shows_module_and_lesson_actions(self):
         self.login_owner()
         response = self.client.get(
@@ -236,8 +310,6 @@ class CurriculumCrudTests(TestCase):
             response,
             reverse("courses:lesson_delete", args=[self.lesson.id]),
         )
-
-    # ----- modules --------------------------------------------------------
 
     def test_module_create_form_loads(self):
         self.login_owner()
@@ -355,8 +427,6 @@ class CurriculumCrudTests(TestCase):
         self.assertEqual(response.status_code, 404)
         self.assertTrue(Module.objects.filter(id=self.module.id).exists())
 
-    # ----- lessons --------------------------------------------------------
-
     def test_lesson_create_form_loads(self):
         self.login_owner()
         response = self.client.get(
@@ -467,6 +537,7 @@ class CurriculumCrudTests(TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertTrue(Lesson.objects.filter(id=self.lesson.id).exists())
 
+
 class CourseCreateUpdateTests(TestCase):
     """Course create/update views for instructors (AB#3301)."""
 
@@ -510,16 +581,12 @@ class CourseCreateUpdateTests(TestCase):
         data.update(overrides)
         return data
 
-    # ----- seeding --------------------------------------------------------
-
     def test_categories_are_seeded(self):
         names = set(Category.objects.values_list("name", flat=True))
         self.assertEqual(
             names,
             {"Web Development", "Cybersecurity", "AI", "Data"},
         )
-
-    # ----- create ---------------------------------------------------------
 
     def test_create_form_loads_for_instructor(self):
         self.login("lina")
@@ -602,8 +669,6 @@ class CourseCreateUpdateTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertIn("/login/", response.url)
 
-    # ----- update ---------------------------------------------------------
-
     def test_own_course_form_is_prefilled(self):
         own_course = Course.objects.create(
             title="My course",
@@ -665,8 +730,6 @@ class CourseCreateUpdateTests(TestCase):
 
         self.assertEqual(response.status_code, 403)
 
-    # ----- studio ---------------------------------------------------------
-
     def test_studio_lists_only_own_courses(self):
         Course.objects.create(
             title="Lina's course",
@@ -709,6 +772,7 @@ class CourseCreateUpdateTests(TestCase):
             response,
             reverse("courses:curriculum", args=[course.pk]),
         )
+
 
 class ThumbnailSizeValidationTests(TestCase):
     def test_rejects_image_larger_than_2_mb(self):
