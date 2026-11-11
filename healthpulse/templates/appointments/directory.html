@@ -1,0 +1,111 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-4">
+
+    <h2 class="mb-4">Find a Doctor</h2>
+
+    <!-- Search and Filters -->
+    <form method="get" class="card card-body mb-4 shadow-sm">
+        <div class="row g-3">
+
+            <div class="col-md-4">
+                <input
+                    type="text"
+                    name="name"
+                    class="form-control"
+                    placeholder="Search by doctor name..."
+                    value="{{ selected_name }}">
+            </div>
+
+            <div class="col-md-3">
+                <select name="specialty" class="form-select">
+                    <option value="">All Specialties</option>
+
+                    {% for spec in specialties %}
+                        {% if spec %}
+                            <option value="{{ spec }}"
+                                {% if spec == selected_specialty %}selected{% endif %}>
+                                {{ spec }}
+                            </option>
+                        {% endif %}
+                    {% endfor %}
+
+                </select>
+            </div>
+
+            <div class="col-md-3">
+                <input
+                    type="text"
+                    name="location"
+                    class="form-control"
+                    placeholder="Clinic or location..."
+                    value="{{ selected_location }}">
+            </div>
+
+            <div class="col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-primary w-100">
+                    Search
+                </button>
+
+                <a href="{% url 'doctor_directory' %}"
+                   class="btn btn-outline-secondary">
+                    Clear
+                </a>
+            </div>
+
+        </div>
+    </form>
+
+    <!-- Doctor Cards -->
+    <div class="row">
+
+        {% for doctor in doctors %}
+
+            <div class="col-md-4 mb-3">
+                <div class="card h-100 shadow-sm">
+
+                    <div class="card-body">
+
+                        <h5 class="card-title">
+                            Dr. {{ doctor.user.first_name }}
+                            {{ doctor.user.last_name }}
+
+                            {% if not doctor.user.first_name and not doctor.user.last_name %}
+                                {{ doctor.user.username }}
+                            {% endif %}
+                        </h5>
+
+                        <p class="card-text text-muted mb-1">
+                            <strong>Specialty:</strong>
+                            {{ doctor.specialty|default:"Not specified" }}
+                        </p>
+
+                        <p class="card-text text-muted mb-3">
+                            <strong>Clinic:</strong>
+                            {{ doctor.clinic_branch|default:"Not specified" }}
+                        </p>
+
+                        <a href="{% url 'doctor_detail' doctor.pk %}"
+                           class="btn btn-outline-primary">
+                            View
+                        </a>
+
+                    </div>
+                </div>
+            </div>
+
+        {% empty %}
+
+            <div class="col-12">
+                <div class="alert alert-info">
+                    No doctors found matching your search.
+                </div>
+            </div>
+
+        {% endfor %}
+
+    </div>
+
+</div>
+{% endblock %}

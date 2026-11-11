@@ -3,12 +3,10 @@ from django.contrib.auth.views import LoginView, LogoutView
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import render, redirect
 from django.urls import reverse
-from django.db.models import Q
 
 from .decorators import doctor_required, patient_required
 from .forms import RoleRegistrationForm
 from .models import PatientProfile, DoctorProfile
-
 
 def register_view(request):
     if request.method == 'POST':
@@ -59,36 +57,3 @@ class RoleLoginView(LoginView):
 
 class RoleLogoutView(LogoutView):
     next_page = 'login'
-
-
-# دالة دليل الأطباء - تبدأ من أول السطر تماماً وليست بداخل الكلاس
-def doctor_directory(request):
-    qs = DoctorProfile.objects.select_related("user")
-
-    specialty = request.GET.get("specialty")
-    name = request.GET.get("name")
-    location = request.GET.get("location")
-
-    if specialty:
-        qs = qs.filter(specialty__iexact=specialty)
-
-    if name:
-        qs = qs.filter(
-            Q(userfirst_nameicontains=name) |
-            Q(userlast_nameicontains=name) |
-            Q(userusernameicontains=name)
-        )
-
-    if location:
-        qs = qs.filter(clinic_branch__icontains=location)
-
-    specialties = DoctorProfile.objects.values_list("specialty", flat=True).distinct()
-
-    context = {
-        "doctors": qs,
-        "specialties": specialties,
-        "selected_specialty": specialty or "",
-        "selected_name": name or "",
-        "selected_location": location or "",
-    }
-    return render(request, "appointments/directory.html", context)
