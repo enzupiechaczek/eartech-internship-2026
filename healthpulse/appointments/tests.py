@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import time, timedelta
 
 from django.test import TestCase
 from django.urls import reverse
@@ -25,7 +25,8 @@ class PendingRequestsTests(TestCase):
         return Appointment.objects.create(
             patient=self.patient,
             doctor=doctor,
-            appointment_date=timezone.now() + timedelta(days=1),
+            appointment_date=timezone.localdate() + timedelta(days=1),
+            time_slot=time(10, 0),
             reason_for_visit=reason,
             status=status,
         )

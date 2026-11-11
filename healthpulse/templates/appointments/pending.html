@@ -10,6 +10,7 @@
             <tr>
                 <th>Patient</th>
                 <th>Date</th>
+                <th>Time</th>
                 <th>Reason</th>
                 <th>Status</th>
                 <th>Actions</th>
@@ -20,6 +21,7 @@
             <tr id="appt-{{ a.pk }}">
                 <td>{{ a.patient.user.get_full_name|default:a.patient.user.username }}</td>
                 <td>{{ a.appointment_date|date:"j M" }}</td>
+                <td>{{ a.time_slot|time:"H:i" }}</td>
                 <td>{{ a.reason_for_visit|truncatewords:8 }}</td>
                 <td class="status">Pending</td>
                 <td>
