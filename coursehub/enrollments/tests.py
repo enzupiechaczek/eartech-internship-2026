@@ -18,7 +18,7 @@ class EnrollmentModelTest(TestCase):
 
     def test_unique_enrollment_constraint(self):
         Enrollment.objects.create(student=self.student, course=self.course)
-        
+
         # Should raise IntegrityError due to unique_together constraint
         with self.assertRaises(IntegrityError):
             Enrollment.objects.create(student=self.student, course=self.course)

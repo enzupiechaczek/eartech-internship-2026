@@ -12,7 +12,7 @@
             <p class="text-muted mb-0">Create and edit your courses.</p>
         </div>
         <a class="btn btn-primary" href="{% url 'courses:course_create' %}">
-            + New Course
+            + Create New Course
         </a>
     </div>
 
@@ -23,12 +23,12 @@
                 <table class="table align-middle mb-0">
                     <thead>
                         <tr>
-                            <th scope="col">Course</th>
+                            <th scope="col">Title</th>
                             <th scope="col">Category</th>
                             <th scope="col">Price</th>
                             <th scope="col">Status</th>
                             <th scope="col">Created</th>
-                            <th scope="col"></th>
+                            <th scope="col">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -40,7 +40,9 @@
                                         <div class="text-muted small">{{ course.subtitle }}</div>
                                     {% endif %}
                                 </td>
+
                                 <td>{{ course.category|default:"—" }}</td>
+
                                 <td>
                                     {% if course.price > 0 %}
                                         ${{ course.price|floatformat:2 }}
@@ -48,29 +50,44 @@
                                         Free
                                     {% endif %}
                                 </td>
+
                                 <td>
                                     {% if course.status == "PUBLISHED" %}
-                                        <span class="badge bg-success">Published</span>
+                                        <span class="badge bg-success">{{ course.get_status_display }}</span>
                                     {% else %}
-                                        <span class="badge bg-secondary">Draft</span>
+                                        <span class="badge bg-secondary">{{ course.get_status_display }}</span>
                                     {% endif %}
                                 </td>
+
                                 <td>{{ course.created_at|date:"M j, Y" }}</td>
+
                                 <td class="text-end">
-                                    <a class="btn btn-sm btn-outline-secondary"
-                                       href="{% url 'courses:course_update' course.pk %}">
-                                        Edit
-                                    </a>
-                                    <form method="post"
-                                          action="{% url 'courses:toggle_publish' course.pk %}"
-                                          class="d-inline">
-                                        {% csrf_token %}
-                                        {% if course.status == "PUBLISHED" %}
-                                            <button type="submit" class="btn btn-sm btn-outline-warning">Unpublish</button>
-                                        {% else %}
-                                            <button type="submit" class="btn btn-sm btn-success">Publish</button>
-                                        {% endif %}
-                                    </form>
+                                    <div class="d-flex justify-content-end gap-2">
+                                        <a class="btn btn-sm btn-outline-primary"
+                                           href="{% url 'courses:curriculum' course.pk %}">
+                                            Curriculum
+                                        </a>
+
+                                        <a class="btn btn-sm btn-outline-secondary"
+                                           href="{% url 'courses:course_update' course.pk %}">
+                                            Edit
+                                        </a>
+
+                                        <form method="post"
+                                              action="{% url 'courses:toggle_publish' course.pk %}"
+                                              class="d-inline">
+                                            {% csrf_token %}
+                                            {% if course.status == "PUBLISHED" %}
+                                                <button type="submit" class="btn btn-sm btn-outline-warning">
+                                                    Unpublish
+                                                </button>
+                                            {% else %}
+                                                <button type="submit" class="btn btn-sm btn-success">
+                                                    Publish
+                                                </button>
+                                            {% endif %}
+                                        </form>
+                                    </div>
                                 </td>
                             </tr>
                         {% endfor %}
@@ -83,7 +100,7 @@
 
         <div class="alert alert-info">
             You have not created any courses yet.
-            Use <strong>+ New Course</strong> to add your first one.
+            Use <strong>+ Create New Course</strong> to add your first one.
         </div>
 
     {% endif %}

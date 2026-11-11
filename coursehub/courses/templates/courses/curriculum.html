@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}{{ course.title }} | Curriculum{% endblock %}
+
+{% block content %}
+
+<div class="container py-4">
+
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+        <div>
+            <h2 class="mb-1">{{ course.title }}</h2>
+            <p class="text-muted mb-0">Course curriculum</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a class="btn btn-outline-secondary" href="{% url 'home' %}">Home</a>
+            <a class="btn btn-primary" href="{% url 'courses:module_create' course.id %}">
+                + Add Module
+            </a>
+        </div>
+    </div>
+
+{% if course.status != "PUBLISHED" %}
+        <div class="alert alert-warning">
+            This course is still a draft. Only you can see it.
+        </div>
+    {% endif %}
+
+    {% for module in modules %}
+
+        <div class="card mb-3">
+            <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <h5 class="mb-0">
+                    Module {{ module.order }}: {{ module.title }}
+                </h5>
+                <div class="btn-group btn-group-sm" role="group">
+                    <a class="btn btn-outline-primary"
+                       href="{% url 'courses:lesson_create' module.id %}">
+                        + Lesson
+                    </a>
+                    <a class="btn btn-outline-secondary"
+                       href="{% url 'courses:module_edit' module.id %}">
+                        Edit
+                    </a>
+                    <a class="btn btn-outline-danger"
+                       href="{% url 'courses:module_delete' module.id %}">
+                        Delete
+                    </a>
+                </div>
+            </div>
+
+            <div class="card-body">
+
+                {% for lesson in module.lessons.all %}
+
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 border-bottom py-2">
+                        <span>{{ lesson.order }}. {{ lesson.title }}</span>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <a class="btn btn-outline-secondary"
+                               href="{% url 'courses:lesson_edit' lesson.id %}">
+                                Edit
+                            </a>
+                            <a class="btn btn-outline-danger"
+                               href="{% url 'courses:lesson_delete' lesson.id %}">
+                                Delete
+                            </a>
+                        </div>
+                    </div>
+
+                {% empty %}
+
+                    <p class="text-muted mb-0">
+                        No lessons added yet.
+                    </p>
+
+                {% endfor %}
+
+            </div>
+        </div>
+
+    {% empty %}
+
+        <div class="alert alert-info">
+            No modules added yet. Use <strong>+ Add Module</strong> to start building this course.
+        </div>
+
+    {% endfor %}
+
+</div>
+
+{% endblock %}

@@ -1,15 +1,14 @@
 ﻿from django import forms
+from django.contrib import messages
 from django.db.models import Avg
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.views.decorators.http import require_POST
 from django.views.generic.edit import CreateView, UpdateView
-
 from accounts.decorators import InstructorRequiredMixin, instructor_required
-
-from .forms import CourseForm
-from .models import Course
+from .forms import CourseForm, LessonForm, ModuleForm
+from .models import Course, Lesson, Module
 
 
 class CourseFormMixin:
@@ -24,12 +23,14 @@ class CourseFormMixin:
         for field in form.fields.values():
             if isinstance(field.widget, forms.CheckboxInput):
                 continue
+
             css_class = (
                 "form-select"
                 if isinstance(field.widget, forms.Select)
                 else "form-control"
             )
             field.widget.attrs.setdefault("class", css_class)
+
         return form
 
 
@@ -101,6 +102,170 @@ def studio(request):
         .order_by("-created_at")
     )
     return render(request, "courses/studio.html", {"courses": courses})
+
+
+@instructor_required
+def course_curriculum(request, course_id):
+    course = get_object_or_404(Course, id=course_id, instructor=request.user)
+    modules = course.modules.prefetch_related("lessons").all()
+
+    return render(
+        request,
+        "courses/curriculum.html",
+        {
+            "course": course,
+            "modules": modules,
+        },
+    )
+
+
+@instructor_required
+def module_create(request, course_id):
+    course = get_object_or_404(Course, id=course_id, instructor=request.user)
+    form = ModuleForm(
+        request.POST or None,
+        initial={"order": course.modules.count() + 1},
+    )
+
+    if request.method == "POST" and form.is_valid():
+        module = form.save(commit=False)
+        module.course = course
+        module.save()
+        messages.success(request, f'Module "{module.title}" was added.')
+        return redirect("courses:curriculum", course_id=course.id)
+
+    return render(
+        request,
+        "courses/module_form.html",
+        {"form": form, "course": course, "module": None},
+    )
+
+
+@instructor_required
+def module_edit(request, module_id):
+    module = get_object_or_404(
+        Module,
+        id=module_id,
+        course__instructor=request.user,
+    )
+    form = ModuleForm(request.POST or None, instance=module)
+
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, f'Module "{module.title}" was updated.')
+        return redirect("courses:curriculum", course_id=module.course_id)
+
+    return render(
+        request,
+        "courses/module_form.html",
+        {"form": form, "course": module.course, "module": module},
+    )
+
+
+@instructor_required
+def module_delete(request, module_id):
+    module = get_object_or_404(
+        Module,
+        id=module_id,
+        course__instructor=request.user,
+    )
+
+    if request.method == "POST":
+        title = module.title
+        course_id = module.course_id
+        module.delete()
+        messages.success(request, f'Module "{title}" was deleted.')
+        return redirect("courses:curriculum", course_id=course_id)
+
+    return render(
+        request,
+        "courses/confirm_delete.html",
+        {
+            "object": module,
+            "object_type": "Module",
+            "course": module.course,
+            "cancel_url": reverse("courses:curriculum", args=[module.course_id]),
+        },
+    )
+
+
+@instructor_required
+def lesson_create(request, module_id):
+    module = get_object_or_404(
+        Module,
+        id=module_id,
+        course__instructor=request.user,
+    )
+    form = LessonForm(
+        request.POST or None,
+        initial={"order": module.lessons.count() + 1},
+    )
+
+    if request.method == "POST" and form.is_valid():
+        lesson = form.save(commit=False)
+        lesson.module = module
+        lesson.save()
+        messages.success(request, f'Lesson "{lesson.title}" was added.')
+        return redirect("courses:curriculum", course_id=module.course_id)
+
+    return render(
+        request,
+        "courses/lesson_form.html",
+        {"form": form, "course": module.course, "module": module, "lesson": None},
+    )
+
+
+@instructor_required
+def lesson_edit(request, lesson_id):
+    lesson = get_object_or_404(
+        Lesson,
+        id=lesson_id,
+        module__course__instructor=request.user,
+    )
+    form = LessonForm(request.POST or None, instance=lesson)
+
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, f'Lesson "{lesson.title}" was updated.')
+        return redirect("courses:curriculum", course_id=lesson.module.course_id)
+
+    return render(
+        request,
+        "courses/lesson_form.html",
+        {
+            "form": form,
+            "course": lesson.module.course,
+            "module": lesson.module,
+            "lesson": lesson,
+        },
+    )
+
+
+@instructor_required
+def lesson_delete(request, lesson_id):
+    lesson = get_object_or_404(
+        Lesson,
+        id=lesson_id,
+        module__course__instructor=request.user,
+    )
+
+    if request.method == "POST":
+        title = lesson.title
+        course_id = lesson.module.course_id
+        lesson.delete()
+        messages.success(request, f'Lesson "{title}" was deleted.')
+        return redirect("courses:curriculum", course_id=course_id)
+
+    return render(
+        request,
+        "courses/confirm_delete.html",
+        {
+            "object": lesson,
+            "object_type": "Lesson",
+            "course": lesson.module.course,
+            "cancel_url": reverse("courses:curriculum", args=[lesson.module.course_id]),
+        },
+    )
 
 
 @instructor_required
