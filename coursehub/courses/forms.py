@@ -24,10 +24,22 @@ class CourseForm(forms.ModelForm):
             "thumbnail",
         ]
 
+    
     def clean_thumbnail(self):
-        return validate_thumbnail_size(
-            self.cleaned_data.get("thumbnail")
-        )
+        thumbnail = self.cleaned_data.get("thumbnail")
+
+        if thumbnail:
+            allowed_extensions = {"jpg", "jpeg", "png"}
+
+            extension = thumbnail.name.rsplit(".", 1)[-1].lower()
+
+            if extension not in allowed_extensions:
+                raise forms.ValidationError(
+                    "Only JPG, JPEG, and PNG images are allowed."
+                )
+
+        return validate_thumbnail_size(thumbnail)
+
 
 
 class ModuleForm(forms.ModelForm):
