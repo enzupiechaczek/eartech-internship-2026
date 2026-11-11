@@ -23,4 +23,7 @@ urlpatterns = [
 
     # Doctor request management
     path('doctor/requests/', appointment_views.pending_requests, name='pending_requests'),
+
+    # Doctor directory
+    path('doctors/', views.doctor_directory, name='doctor_directory'),
 ]
