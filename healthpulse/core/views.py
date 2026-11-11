@@ -6,10 +6,11 @@ from django.urls import reverse
 from django.db.models import Q
 from django.views.generic import DetailView
 
+
+from appointments.models import Appointment
 from .decorators import doctor_required, patient_required
 from .forms import RoleRegistrationForm
 from .models import PatientProfile, DoctorProfile
-
 
 def register_view(request):
     if request.method == 'POST':
@@ -48,7 +49,17 @@ def doctor_dashboard(request):
 
 @patient_required
 def patient_dashboard(request):
-    return render(request, 'patient_dashboard.html')
+    patient = PatientProfile.objects.filter(user=request.user).first()
+    appointments = Appointment.objects.none()
+
+    if patient is not None:
+        appointments = (
+            Appointment.objects.filter(patient=patient)
+            .select_related("doctor__user")
+            .order_by("appointment_date", "time_slot")
+        )
+
+    return render(request, 'patient_dashboard.html', {'appointments': appointments})
 
 
 class RoleLoginView(LoginView):
@@ -60,6 +71,7 @@ class RoleLoginView(LoginView):
 
 class RoleLogoutView(LogoutView):
     next_page = 'login'
+
 
 # دالة دليل الأطباء - تبدأ من أول السطر تماماً وليست بداخل الكلاس
 def doctor_directory(request):
