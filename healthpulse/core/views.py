@@ -1,16 +1,12 @@
-
 from django.contrib.auth import login
 from django.contrib.auth.views import LoginView, LogoutView
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import render, redirect
 from django.urls import reverse
-from django.db.models import Q
-from django.views.generic import DetailView
 
 from .decorators import doctor_required, patient_required
 from .forms import RoleRegistrationForm
 from .models import PatientProfile, DoctorProfile
-
 
 def register_view(request):
     if request.method == 'POST':
@@ -49,17 +45,7 @@ def doctor_dashboard(request):
 
 @patient_required
 def patient_dashboard(request):
-    appointments = (
-        request.user.patientprofile.appointments
-        .select_related("doctor__user")
-        .order_by("appointment_date", "time_slot")
-    )
-
-    context = {
-        "appointments": appointments,
-    }
-
-    return render(request, "patient_dashboard.html", context)
+    return render(request, 'patient_dashboard.html')
 
 
 class RoleLoginView(LoginView):
@@ -71,42 +57,3 @@ class RoleLoginView(LoginView):
 
 class RoleLogoutView(LogoutView):
     next_page = 'login'
-
-def doctor_directory(request):
-    qs = DoctorProfile.objects.select_related("user")
-
-    specialty = request.GET.get("specialty")
-    name = request.GET.get("name")
-    location = request.GET.get("location")
-
-    if specialty:
-        qs = qs.filter(specialty__iexact=specialty)
-
-    if name:
-        qs = qs.filter(
-            Q(user__first_name__icontains=name) |
-            Q(user__last_name__icontains=name)
-        )
-
-    if location:
-        qs = qs.filter(clinic_branch__icontains=location)
-
-    specialties = DoctorProfile.objects.values_list(
-        "specialty", flat=True
-    ).distinct()
-
-    context = {
-        "doctors": qs,
-        "specialties": specialties,
-        "selected_specialty": specialty or "",
-        "selected_name": name or "",
-        "selected_location": location or "",
-    }
-
-    return render(request, "appointments/directory.html", context)
-
-class DoctorDetailView(DetailView):
-    model = DoctorProfile
-    template_name = 'appointments/doctor_detail.html'
-    context_object_name = 'doctor'
-    

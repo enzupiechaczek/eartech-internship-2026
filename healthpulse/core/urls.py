@@ -1,7 +1,5 @@
 from django.contrib import admin
 from django.urls import path
-from django.conf import settings
-from django.conf.urls.static import static
 from . import views
 
 urlpatterns = [
@@ -21,8 +19,4 @@ urlpatterns = [
     path('redirect/', views.home_redirect, name='home_redirect'),
     path('doctor/dashboard/', views.doctor_dashboard, name='doctor_dashboard'),
     path('patient/dashboard/', views.patient_dashboard, name='patient_dashboard'),
-    path('doctors/', views.doctor_directory, name='doctor_directory'),
-    path('doctors/<int:pk>/', views.DoctorDetailView.as_view(), name='doctor_detail'),
 ]
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
