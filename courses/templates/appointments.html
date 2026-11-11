@@ -1,0 +1,57 @@
+!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>HealthPulse - Pending Requests</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #f4f4f4; }
+        button { padding: 6px 12px; cursor: pointer; margin-right: 5px; }
+    </style>
+</head>
+<body>
+
+    <h2>Doctor Request Management - Pending Appointments</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Appointment ID</th>
+                <th>Patient Name</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr id="appt-1">
+                <td>1</td>
+                <td>Ahmed Ali</td>
+                <td class="status">Pending</td>
+                <td>
+                    <button class="act" data-id="1" data-action="APPROVED">Approve</button>
+                    <button class="act" data-id="1" data-action="REJECTED">Reject</button>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <script>
+    const csrftoken = document.cookie.split("; ").find(c => c.startsWith("csrftoken=")).split("=")[1];
+    document.querySelectorAll(".act").forEach(btn => btn.addEventListener("click", async () => {
+        const res = await fetch(/api/appointments/${btn.dataset.id}/status/, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken },
+            body: JSON.stringify({ status: btn.dataset.action })
+        });
+        const data = await res.json();
+        if (!res.ok) { alert(data.error); return; }
+        const row = document.getElementById("appt-" + data.id);
+        row.querySelector(".status").textContent = data.status === "APPROVED" ? "✔️ Approved" : "❌ Rejected";
+        row.querySelectorAll(".act").forEach(b => b.remove());
+    }));
+    </script>
+
+</body>
+</html>
