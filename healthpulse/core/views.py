@@ -1,3 +1,4 @@
+
 from django.contrib.auth import login
 from django.contrib.auth.views import LoginView, LogoutView
 from django.core.exceptions import PermissionDenied
@@ -48,7 +49,17 @@ def doctor_dashboard(request):
 
 @patient_required
 def patient_dashboard(request):
-    return render(request, 'patient_dashboard.html')
+    appointments = (
+        request.user.patientprofile.appointments
+        .select_related("doctor__user")
+        .order_by("appointment_date", "time_slot")
+    )
+
+    context = {
+        "appointments": appointments,
+    }
+
+    return render(request, "patient_dashboard.html", context)
 
 
 class RoleLoginView(LoginView):
