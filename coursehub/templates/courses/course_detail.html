@@ -1,0 +1,93 @@
+
+{% extends "base.html" %}
+
+{% block title %}{{ course.title }} | CourseHub{% endblock %}
+
+{% block content %}
+<section class="course-detail">
+
+    <div class="course-detail-header">
+        {% if course.category %}
+            <span class="home-eyebrow home-eyebrow-dark">
+                {{ course.category.name }}
+            </span>
+        {% endif %}
+
+        <h1 class="course-detail-title">{{ course.title }}</h1>
+
+        {% if course.subtitle %}
+            <p class="course-detail-subtitle">{{ course.subtitle }}</p>
+        {% endif %}
+
+        <p class="course-detail-instructor">
+            Taught by
+            {{ course.instructor.get_full_name|default:course.instructor.username }}
+        </p>
+
+        <div class="course-detail-rating">
+            {% if average_rating %}
+                <span class="course-rating-stars" aria-label="Rated {{ average_rating|floatformat:1 }} out of 5">
+                    ★★★★★
+                </span>
+                <strong>{{ average_rating|floatformat:1 }}/5</strong>
+                <span>{{ review_count }} review{{ review_count|pluralize }}</span>
+            {% else %}
+                <span class="course-rating-empty">No reviews yet</span>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if course.thumbnail %}
+        <div class="course-detail-image">
+            <img src="{{ course.thumbnail.url }}" alt="{{ course.title }}">
+        </div>
+    {% endif %}
+
+    <section class="course-detail-description">
+        <h2>About this course</h2>
+        <p>{{ course.description|linebreaks }}</p>
+    </section>
+
+    <section class="course-reviews">
+        <h2>Student reviews</h2>
+
+        {% if reviews %}
+            {% for review in reviews %}
+                <article class="course-review">
+                    <div class="course-review-header">
+                        <strong>
+                            {{ review.student.get_full_name|default:review.student.username }}
+                        </strong>
+
+                        <span class="course-rating-stars"
+                              aria-label="{{ review.rating }} out of 5 stars">
+                            {% for star in "12345" %}
+                                {% if forloop.counter <= review.rating %}
+                                    ★
+                                {% else %}
+                                    ☆
+                                {% endif %}
+                            {% endfor %}
+                        </span>
+                    </div>
+
+                    {% if review.comment %}
+                        <p>{{ review.comment|linebreaks }}</p>
+                    {% endif %}
+
+                    <small>{{ review.created_at|date:"d M Y" }}</small>
+                </article>
+            {% endfor %}
+        {% else %}
+            <p class="course-rating-empty">
+                No students have reviewed this course yet.
+            </p>
+        {% endif %}
+    </section>
+
+    <a class="home-link" href="{% url 'courses:list' %}">
+        Back to courses
+    </a>
+
+</section>
+{% endblock %}

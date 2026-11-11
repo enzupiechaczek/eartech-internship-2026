@@ -1,5 +1,6 @@
-from django import forms
+﻿from django import forms
 from django.contrib import messages
+from django.db.models import Avg
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
@@ -49,13 +50,16 @@ class CourseUpdateView(InstructorRequiredMixin, CourseFormMixin, UpdateView):
 
 
 def course_list(request):
-    return HttpResponse('Courses app is working ✅')
+    return HttpResponse('Courses app is working')
 
 
 def home(request):
     courses = (
         Course.objects.filter(status=Course.Status.PUBLISHED)
-        .select_related("instructor")
+        .select_related("instructor", "category")
+        .annotate(
+            average_rating=Avg("reviews__rating"),
+        )
         .order_by("-created_at")[:8]
     )
     return render(request, "home.html", {"courses": courses})
@@ -63,6 +67,31 @@ def home(request):
 
 def about(request):
     return render(request, "about.html")
+
+
+def course_detail(request, pk):
+    course = get_object_or_404(
+        Course.objects.select_related("instructor", "category"),
+        pk=pk,
+        status=Course.Status.PUBLISHED,
+    )
+
+    rating_summary = course.reviews.aggregate(
+        average_rating=Avg("rating")
+    )
+
+    reviews = course.reviews.select_related("student").all()
+
+    return render(
+        request,
+        "courses/course_detail.html",
+        {
+            "course": course,
+            "average_rating": rating_summary["average_rating"],
+            "review_count": reviews.count(),
+            "reviews": reviews,
+        },
+    )
 
 
 @instructor_required
