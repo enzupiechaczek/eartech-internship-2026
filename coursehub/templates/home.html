@@ -1,27 +1,87 @@
 {% extends "base.html" %}
 
-{% block title %}Home | CourseHub{% endblock %}
+{% block title %}CourseHub | Learn from real instructors{% endblock %}
 
 {% block content %}
-    <div class="container py-4">
-    <h2 class="mb-4">Featured Courses</h2>
-    <div class="row">
-        {% for c in courses %}
-        <div class="col-md-3 mb-3">
-            <div class="card h-100">
-            <img class="card-img-top"
-                src="{% if c.thumbnail %}{{ c.thumbnail.url }}{% else %}https://placehold.co/300x170{% endif %}"
-                alt="{{ c.title }}">
-            <div class="card-body">
-                <h5>{{ c.title|truncatechars:40 }}</h5>
-                <p class="text-muted">by {{ c.instructor.get_full_name|default:c.instructor.username }}</p>
-                <b>{% if c.price > 0 %}${{ c.price|floatformat:2 }}{% else %}Free{% endif %}</b>
-            </div>
-            </div>
+<section class="home-hero">
+    <span class="home-eyebrow">Learn at your own pace</span>
+    <h1 class="home-title">Practical courses,<br>taught by people who do the work.</h1>
+    <p class="home-lead">
+        CourseHub brings courses, progress and instructors together in one
+        place. Join for free and start learning today.
+    </p>
+
+    <div class="home-actions">
+        {% if user.is_authenticated %}
+            {% if user.is_instructor %}
+                <a class="home-btn home-btn-primary" href="{% url 'studio' %}">Open Creator Studio</a>
+                <a class="home-btn home-btn-ghost" href="{% url 'courses:list' %}">Browse courses</a>
+            {% else %}
+                <a class="home-btn home-btn-primary" href="{% url 'courses:list' %}">Browse courses</a>
+            {% endif %}
+        {% else %}
+            <a class="home-btn home-btn-primary" href="{% url 'register' %}">Create a free account</a>
+            <a class="home-btn home-btn-ghost" href="{% url 'login' %}">Log in</a>
+        {% endif %}
+    </div>
+
+    <ul class="home-points">
+        <li>Self-paced lessons</li>
+        <li>Instructor-led courses</li>
+        <li>Free to join</li>
+    </ul>
+</section>
+
+<section class="home-courses">
+    <div class="home-section-head">
+        <div>
+            <span class="home-eyebrow home-eyebrow-dark">Catalogue</span>
+            <h2 class="home-section-title">Featured courses</h2>
+            <p class="home-section-text">
+                A selection of recently published courses from our instructors.
+            </p>
         </div>
+        <a class="home-link" href="{% url 'courses:list' %}">View all courses</a>
+    </div>
+
+    <div class="home-grid">
+        {% for c in courses %}
+            <article class="home-card">
+                <div class="home-card-media">
+                    <img
+                        src="{% if c.thumbnail %}{{ c.thumbnail.url }}{% else %}https://placehold.co/600x338/e2e8f0/64748b?text=Course{% endif %}"
+                        alt="{{ c.title }}"
+                        loading="lazy">
+                    {% if c.category %}
+                        <span class="home-badge">{{ c.category.name }}</span>
+                    {% endif %}
+                </div>
+
+                <div class="home-card-body">
+                    <h3 class="home-card-title">{{ c.title }}</h3>
+                    {% if c.subtitle %}
+                        <p class="home-card-sub">{{ c.subtitle|truncatechars:90 }}</p>
+                    {% endif %}
+                    <p class="home-card-meta">
+                        by {{ c.instructor.get_full_name|default:c.instructor.username }}
+                    </p>
+                </div>
+
+                <div class="home-card-foot">
+                    <span class="home-price{% if not c.price %} home-price-free{% endif %}">
+                        {% if c.price > 0 %}${{ c.price|floatformat:2 }}{% else %}Free{% endif %}
+                    </span>
+                </div>
+            </article>
         {% empty %}
-        <p>No courses yet.</p>
+            <div class="home-empty">
+                <h3>No courses yet.</h3>
+                <p>Published courses will appear here as soon as instructors add them.</p>
+                {% if user.is_authenticated and user.is_instructor %}
+                    <a class="home-btn home-btn-primary" href="{% url 'courses:course_create' %}">Create your first course</a>
+                {% endif %}
+            </div>
         {% endfor %}
     </div>
-    </div>
+</section>
 {% endblock %}
