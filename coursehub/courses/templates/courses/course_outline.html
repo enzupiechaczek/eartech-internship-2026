@@ -76,18 +76,67 @@
     </section>
 
     <aside class="outline-cta">
-        {% if user.is_authenticated %}
-            <p class="outline-cta-text">Ready to keep learning?</p>
+
+        {% if is_instructor %}
+            <p class="outline-cta-text">
+                You are the instructor of this course.
+            </p>
             <div class="outline-cta-actions">
-                <a class="home-btn home-btn-primary" href="{% url 'home' %}">Browse courses</a>
+                <a class="home-btn home-btn-primary"
+                   href="{% url 'courses:curriculum' course.id %}">
+                    Manage Course
+                </a>
             </div>
-        {% else %}
-            <p class="outline-cta-text">Create a free account to start learning.</p>
+
+        {% elif is_enrolled %}
+            <p class="outline-cta-text">
+                Welcome back! Continue your learning.
+            </p>
             <div class="outline-cta-actions">
-                <a class="home-btn home-btn-primary" href="{% url 'register' %}">Create a free account</a>
-                <a class="home-btn home-btn-ghost" href="{% url 'login' %}">Log in</a>
+                {% with first_module=modules|first %}
+                    {% if first_module %}
+                        {% with first_lesson=first_module.lessons.all|first %}
+                            {% if first_lesson %}
+                                <a class="home-btn home-btn-primary"
+                                   href="{% url 'courses:lesson_view' first_lesson.id %}">
+                                    Continue Learning
+                                </a>
+                            {% else %}
+                                <span>No lessons available yet.</span>
+                            {% endif %}
+                        {% endwith %}
+                    {% else %}
+                        <span>No lessons available yet.</span>
+                    {% endif %}
+                {% endwith %}
+            </div>
+
+        {% elif user.is_authenticated %}
+            <p class="outline-cta-text">
+                Ready to start learning?
+            </p>
+            <div class="outline-cta-actions">
+                <span class="home-btn home-btn-primary">
+                    Enroll Now
+                </span>
+            </div>
+
+        {% else %}
+            <p class="outline-cta-text">
+                Create a free account to start learning.
+            </p>
+            <div class="outline-cta-actions">
+                <a class="home-btn home-btn-primary"
+                   href="{% url 'register' %}">
+                    Create a free account
+                </a>
+                <a class="home-btn home-btn-ghost"
+                   href="{% url 'login' %}">
+                    Log in
+                </a>
             </div>
         {% endif %}
+
     </aside>
 </div>
 {% endblock %}

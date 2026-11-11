@@ -9,6 +9,13 @@ urlpatterns = [
     # Public curriculum outline
     path('<int:pk>/outline/', views.course_outline, name='outline'),
 
+    # Protected lesson content
+    path(
+        'lessons/<int:lesson_id>/',
+        views.lesson_view,
+        name='lesson_view',
+    ),
+
     # Course Create and Edit
     path('new/', views.CourseCreateView.as_view(), name='course_create'),
     path('<int:pk>/edit/', views.CourseUpdateView.as_view(), name='course_update'),

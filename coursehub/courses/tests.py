@@ -9,6 +9,7 @@ from django.test import TestCase
 from django.urls import reverse
 from PIL import Image
 
+from enrollments.models import Enrollment
 
 from .forms import MAX_THUMBNAIL_SIZE, validate_thumbnail_size
 from .models import Category, Course, Module, Lesson
@@ -28,6 +29,7 @@ class CourseListViewTests(TestCase):
     def test_course_list_page_loads(self):
         response = self.client.get(reverse('courses:list'))
         self.assertEqual(response.status_code, 200)
+
 
 class HomeViewTests(TestCase):
     def setUp(self):
@@ -122,8 +124,7 @@ class PublicCourseOutlineTests(TestCase):
 
     def outline_url(self, course=None):
         return reverse("courses:outline", args=[(course or self.course).pk])
-
-    # ----- public access --------------------------------------------------
+# ----- public access --------------------------------------------------
 
     def test_guest_can_view_published_outline(self):
         response = self.client.get(self.outline_url())
@@ -159,8 +160,7 @@ class PublicCourseOutlineTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 404)
-
-    # ----- draft courses stay private ------------------------------------
+         # ----- draft courses stay private ------------------------------------
 
     def test_draft_course_returns_404_for_guest(self):
         draft = Course.objects.create(
@@ -185,8 +185,7 @@ class PublicCourseOutlineTests(TestCase):
         response = self.client.get(self.outline_url(draft))
 
         self.assertEqual(response.status_code, 404)
-
-    # ----- read-only ------------------------------------------------------
+# ----- read-only ------------------------------------------------------
 
     def test_outline_has_no_instructor_edit_controls(self):
         self.client.login(username="lina", password="pass")
@@ -226,15 +225,13 @@ class PublicCourseOutlineTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "This course is published but its outline is still being built.")
 
-    # ----- entry point ----------------------------------------------------
 
     def test_home_cards_link_to_the_outline(self):
         response = self.client.get(reverse("home"))
 
         self.assertContains(response, self.outline_url())
 
-
-class CourseCurriculumTests(TestCase):
+class InstructorCurriculumAccessTests(TestCase):
 
     def setUp(self):
         User = get_user_model()
@@ -244,7 +241,6 @@ class CourseCurriculumTests(TestCase):
             password="testpass123",
             role="INSTRUCTOR",
         )
-
         self.other_instructor = User.objects.create_user(
             username="instructor2",
             password="testpass123",
@@ -345,14 +341,14 @@ class CurriculumCrudTests(TestCase):
 
     def login_student(self):
         self.client.login(username="student", password="testpass123")
-
-    # ----- curriculum page ------------------------------------------------
+ # ----- curriculum page ------------------------------------------------
 
     def test_curriculum_shows_module_and_lesson_actions(self):
         self.login_owner()
         response = self.client.get(
             reverse("courses:curriculum", args=[self.course.id])
         )
+        self.assertEqual(response.status_code, 200)
 
         self.assertContains(response, "+ Add Module")
         self.assertContains(response, "+ Lesson")
@@ -381,40 +377,6 @@ class CurriculumCrudTests(TestCase):
             reverse("courses:lesson_delete", args=[self.lesson.id]),
         )
 
-    # ----- modules --------------------------------------------------------
-
-    def test_module_create_form_loads(self):
-        self.login_owner()
-        response = self.client.get(
-            reverse("courses:module_create", args=[self.course.id])
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, "courses/module_form.html")
-
-    def test_instructor_can_create_module(self):
-        self.login_owner()
-        response = self.client.post(
-            reverse("courses:module_create", args=[self.course.id]),
-            {"title": "Advanced Topics", "order": 2},
-        )
-
-        self.assertRedirects(
-            response,
-            reverse("courses:curriculum", args=[self.course.id]),
-        )
-        module = Module.objects.get(title="Advanced Topics")
-        self.assertEqual(module.course, self.course)
-
-    def test_module_create_requires_ownership(self):
-        self.login_other()
-        response = self.client.post(
-            reverse("courses:module_create", args=[self.course.id]),
-            {"title": "Hijacked", "order": 3},
-        )
-
-        self.assertEqual(response.status_code, 404)
-        self.assertFalse(Module.objects.filter(title="Hijacked").exists())
 
     def test_module_create_requires_instructor_role(self):
         self.login_student()
@@ -499,7 +461,69 @@ class CurriculumCrudTests(TestCase):
         self.assertEqual(response.status_code, 404)
         self.assertTrue(Module.objects.filter(id=self.module.id).exists())
 
-    # ----- lessons --------------------------------------------------------
+    def test_instructor_can_delete_lesson(self):
+        self.login_owner()
+        response = self.client.post(
+            reverse("courses:lesson_delete", args=[self.lesson.id])
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("courses:curriculum", args=[self.course.id]),
+        )
+        self.assertFalse(Lesson.objects.filter(id=self.lesson.id).exists())
+
+    def test_lesson_delete_requires_ownership(self):
+        self.login_other()
+        response = self.client.post(
+            reverse("courses:lesson_delete", args=[self.lesson.id])
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(Lesson.objects.filter(id=self.lesson.id).exists())
+
+    def test_student_cannot_delete_lessons(self):
+        self.login_student()
+        response = self.client.post(
+            reverse("courses:lesson_delete", args=[self.lesson.id])
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Lesson.objects.filter(id=self.lesson.id).exists())
+
+
+    def test_module_create_form_loads(self):
+        self.login_owner()
+        response = self.client.get(
+            reverse("courses:module_create", args=[self.course.id])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "courses/module_form.html")
+
+    def test_instructor_can_create_module(self):
+        self.login_owner()
+        response = self.client.post(
+            reverse("courses:module_create", args=[self.course.id]),
+            {"title": "Advanced Topics", "order": 2},
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("courses:curriculum", args=[self.course.id]),
+        )
+        module = Module.objects.get(title="Advanced Topics")
+        self.assertEqual(module.course, self.course)
+
+    def test_module_create_requires_ownership(self):
+        self.login_other()
+        response = self.client.post(
+            reverse("courses:module_create", args=[self.course.id]),
+            {"title": "Hijacked", "order": 3},
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(Module.objects.filter(title="Hijacked").exists())
 
     def test_lesson_create_form_loads(self):
         self.login_owner()
@@ -581,35 +605,6 @@ class CurriculumCrudTests(TestCase):
         self.assertTemplateUsed(response, "courses/confirm_delete.html")
         self.assertContains(response, "Installing Python")
 
-    def test_instructor_can_delete_lesson(self):
-        self.login_owner()
-        response = self.client.post(
-            reverse("courses:lesson_delete", args=[self.lesson.id])
-        )
-
-        self.assertRedirects(
-            response,
-            reverse("courses:curriculum", args=[self.course.id]),
-        )
-        self.assertFalse(Lesson.objects.filter(id=self.lesson.id).exists())
-
-    def test_lesson_delete_requires_ownership(self):
-        self.login_other()
-        response = self.client.post(
-            reverse("courses:lesson_delete", args=[self.lesson.id])
-        )
-
-        self.assertEqual(response.status_code, 404)
-        self.assertTrue(Lesson.objects.filter(id=self.lesson.id).exists())
-
-    def test_student_cannot_delete_lessons(self):
-        self.login_student()
-        response = self.client.post(
-            reverse("courses:lesson_delete", args=[self.lesson.id])
-        )
-
-        self.assertEqual(response.status_code, 403)
-        self.assertTrue(Lesson.objects.filter(id=self.lesson.id).exists())
 
 class CourseCreateUpdateTests(TestCase):
     """Course create/update views for instructors (AB#3301)."""
@@ -653,8 +648,7 @@ class CourseCreateUpdateTests(TestCase):
         }
         data.update(overrides)
         return data
-
-    # ----- seeding --------------------------------------------------------
+     # ----- seeding --------------------------------------------------------
 
     def test_categories_are_seeded(self):
         names = set(Category.objects.values_list("name", flat=True))
@@ -662,10 +656,6 @@ class CourseCreateUpdateTests(TestCase):
             names,
             {"Web Development", "Cybersecurity", "AI", "Data"},
         )
-
-    # ----- create ---------------------------------------------------------
-
-    def test_create_form_loads_for_instructor(self):
         self.login("lina")
         response = self.client.get(reverse("courses:course_create"))
 
@@ -809,7 +799,15 @@ class CourseCreateUpdateTests(TestCase):
 
         self.assertEqual(response.status_code, 403)
 
-    # ----- studio ---------------------------------------------------------
+
+    def test_create_form_loads_for_instructor(self):
+        self.login("lina")
+        response = self.client.get(reverse("courses:course_create"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "courses/course_form.html")
+        self.assertContains(response, "Create New Course")
+        self.assertContains(response, "Web Development")
 
     def test_studio_lists_only_own_courses(self):
         Course.objects.create(
@@ -862,6 +860,212 @@ class CourseCreateUpdateTests(TestCase):
             response,
             reverse("courses:curriculum", args=[course.pk]),
         )
+
+
+class CourseOutlineCTATests(TestCase):
+    """Test course outline buttons for different user states (AB#3313)."""
+
+    def setUp(self):
+        User = get_user_model()
+
+        self.instructor = User.objects.create_user(
+            username="cta_instructor",
+            password="testpass123",
+            role="INSTRUCTOR",
+        )
+
+        self.student = User.objects.create_user(
+            username="cta_student",
+            password="testpass123",
+            role="STUDENT",
+        )
+
+        self.course = Course.objects.create(
+            title="Django Course",
+            description="Learn Django step by step.",
+            instructor=self.instructor,
+            status=Course.Status.PUBLISHED,
+        )
+
+        self.module = Module.objects.create(
+            course=self.course,
+            title="Introduction",
+            order=1,
+        )
+
+        self.lesson = Lesson.objects.create(
+            module=self.module,
+            title="Getting Started",
+            notes="Introduction to Django.",
+            order=1,
+        )
+
+        self.url = reverse(
+            "courses:outline",
+            args=[self.course.id],
+        )
+
+    def test_instructor_sees_manage_course_button(self):
+        self.client.force_login(self.instructor)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Manage Course")
+        self.assertContains(
+            response,
+            reverse("courses:curriculum", args=[self.course.id]),
+        )
+
+    def test_enrolled_student_sees_continue_learning_button(self):
+        Enrollment.objects.create(
+            student=self.student,
+            course=self.course,
+        )
+
+        self.client.force_login(self.student)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Continue Learning")
+        self.assertContains(
+            response,
+            reverse("courses:lesson_view", args=[self.lesson.id]),
+        )
+
+    def test_non_enrolled_student_sees_enroll_now_button(self):
+        self.client.force_login(self.student)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Enroll Now")
+
+    def test_anonymous_user_sees_login_and_register_buttons(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Log in")
+        self.assertContains(response, "Create a free account")
+
+class LessonAccessTests(TestCase):
+
+    def setUp(self):
+        User = get_user_model()
+
+        self.instructor = User.objects.create_user(
+            username="lesson_instructor",
+            password="testpass123",
+            role="INSTRUCTOR",
+        )
+
+        self.student = User.objects.create_user(
+            username="lesson_student",
+            password="testpass123",
+            role="STUDENT",
+        )
+
+        self.other_student = User.objects.create_user(
+            username="other_student",
+            password="testpass123",
+            role="STUDENT",
+        )
+
+        self.course = Course.objects.create(
+            title="Python Course",
+            description="Python lessons",
+            instructor=self.instructor,
+            status=Course.Status.PUBLISHED,
+        )
+
+        self.module = Module.objects.create(
+            course=self.course,
+            title="Introduction",
+            order=1,
+        )
+
+        self.lesson = Lesson.objects.create(
+            module=self.module,
+            title="First Lesson",
+            notes="This is protected lesson content.",
+            order=1,
+        )
+
+        self.url = reverse(
+            "courses:lesson_view",
+            args=[self.lesson.pk],
+        )
+
+    def test_instructor_can_view_lesson(self):
+        self.client.login(
+            username="lesson_instructor",
+            password="testpass123",
+        )
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "This is protected lesson content.")
+
+    def test_enrolled_student_can_view_lesson(self):
+        Enrollment.objects.create(
+            student=self.student,
+            course=self.course,
+        )
+
+        self.client.login(
+            username="lesson_student",
+            password="testpass123",
+        )
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "This is protected lesson content.")
+
+    def test_non_enrolled_student_gets_403(self):
+        self.client.login(
+            username="other_student",
+            password="testpass123",
+        )
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 403)
+        self.assertNotContains(
+            response,
+            "This is protected lesson content.",
+            status_code=403,
+        )
+
+    def test_anonymous_user_is_redirected_to_login(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("login"))
+
+    def test_enrolled_student_cannot_view_draft_course_lesson(self):
+        self.course.status = Course.Status.DRAFT
+        self.course.save()
+
+        Enrollment.objects.create(
+            student=self.student,
+            course=self.course,
+        )
+
+        self.client.login(
+            username="lesson_student",
+            password="testpass123",
+        )
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 403)
+
+
+
+
 
 class ThumbnailSizeValidationTests(TestCase):
     def test_rejects_image_larger_than_2_mb(self):

@@ -1,11 +1,15 @@
 from django import forms
 from django.contrib import messages
+from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.views.decorators.http import require_POST
 from django.views.generic.edit import CreateView, UpdateView
+
 from accounts.decorators import InstructorRequiredMixin, instructor_required
+from enrollments.models import Enrollment
+
 from .forms import CourseForm, LessonForm, ModuleForm
 from .models import Course, Lesson, Module
 
@@ -52,6 +56,7 @@ def course_list(request):
     return HttpResponse('Courses app is working ✅')
 
 
+
 def course_outline(request, pk):
     """Public, read-only curriculum outline for a published course."""
     course = get_object_or_404(
@@ -61,14 +66,68 @@ def course_outline(request, pk):
     )
     modules = course.modules.prefetch_related("lessons").all()
 
+    is_instructor = (
+        request.user.is_authenticated
+        and course.instructor_id == request.user.id
+    )
+
+    is_enrolled = (
+        request.user.is_authenticated
+        and Enrollment.objects.filter(
+            student=request.user,
+            course=course,
+        ).exists()
+    )
+
     return render(
         request,
         "courses/course_outline.html",
         {
             "course": course,
             "modules": modules,
-            "lesson_count": sum(len(module.lessons.all()) for module in modules),
+            "lesson_count": sum(
+                len(module.lessons.all()) for module in modules
+            ),
+            "is_instructor": is_instructor,
+            "is_enrolled": is_enrolled,
         },
+    )
+
+
+def lesson_view(request, lesson_id):
+    """Show lesson content only to the course instructor or enrolled students."""
+    lesson = get_object_or_404(
+        Lesson.objects.select_related("module__course"),
+        pk=lesson_id,
+    )
+    course = lesson.module.course
+
+    is_instructor = (
+        request.user.is_authenticated
+        and course.instructor_id == request.user.id
+    )
+
+    is_enrolled = (
+        request.user.is_authenticated
+        and Enrollment.objects.filter(
+            student=request.user,
+            course=course,
+        ).exists()
+    )
+
+    if not is_instructor and not is_enrolled:
+        if not request.user.is_authenticated:
+            return redirect("login")
+
+        raise PermissionDenied
+
+    if course.status != Course.Status.PUBLISHED and not is_instructor:
+        raise PermissionDenied
+
+    return render(
+        request,
+        "courses/lesson_detail.html",
+        {"lesson": lesson, "course": course},
     )
 
 
