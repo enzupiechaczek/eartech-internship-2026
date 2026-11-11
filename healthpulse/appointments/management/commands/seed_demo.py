@@ -1,5 +1,5 @@
 """Create demo doctors, patients and appointment requests for local testing only."""
-from datetime import datetime
+from datetime import date, time
 
 from django.core.management.base import BaseCommand
 from django.utils import timezone
@@ -44,7 +44,8 @@ class Command(BaseCommand):
                 doctor=doctor,
                 reason_for_visit=reason,
                 defaults={
-                    'appointment_date': timezone.make_aware(datetime(year, 11, day, 10, 0)),
+                    'appointment_date': date(year, 11, day),
+                    'time_slot': time(10, 0),
                     'status': status,
                 },
             )
