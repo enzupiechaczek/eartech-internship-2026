@@ -1,17 +1,17 @@
 
 from django.contrib import admin
-from django.urls import path
 from django.conf import settings
 from django.conf.urls.static import static
+from django.urls import path
 
-from . import views
 from appointments import views as appointment_views
+from . import views
 
 
 urlpatterns = [
     path('admin/', admin.site.urls),
 
-    # Root
+    # Root: login page or the user's own dashboard
     path('', views.home_redirect, name='home'),
 
     # Registration

@@ -61,6 +61,7 @@ class RoleLoginView(LoginView):
 class RoleLogoutView(LogoutView):
     next_page = 'login'
 
+# دالة دليل الأطباء - تبدأ من أول السطر تماماً وليست بداخل الكلاس
 def doctor_directory(request):
     qs = DoctorProfile.objects.select_related("user")
 
@@ -74,7 +75,8 @@ def doctor_directory(request):
     if name:
         qs = qs.filter(
             Q(user__first_name__icontains=name) |
-            Q(user__last_name__icontains=name)
+            Q(user__last_name__icontains=name) |
+            Q(user__username__icontains=name)
         )
 
     if location:
@@ -98,4 +100,3 @@ class DoctorDetailView(DetailView):
     model = DoctorProfile
     template_name = 'appointments/doctor_detail.html'
     context_object_name = 'doctor'
-    
