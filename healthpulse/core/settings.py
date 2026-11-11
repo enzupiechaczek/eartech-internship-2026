@@ -25,8 +25,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 'core',
-    'appointments',
-]
+'appointments',
+  ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -119,3 +119,6 @@ LOGIN_REDIRECT_URL = '/register/'
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'home_redirect'
 LOGOUT_REDIRECT_URL = 'login'
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
