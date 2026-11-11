@@ -29,6 +29,13 @@ urlpatterns = [
     # Doctor request management
     path('doctor/requests/', appointment_views.pending_requests, name='pending_requests'),
 
+    # Appointment status API
+    path(
+        'api/appointments/<int:pk>/status/',
+        appointment_views.update_status,
+        name='update_appointment_status',
+    ),
+
     # Doctor directory
     path('doctors/', views.doctor_directory, name='doctor_directory'),
     path('doctors/<int:pk>/', views.DoctorDetailView.as_view(), name='doctor_detail'),
