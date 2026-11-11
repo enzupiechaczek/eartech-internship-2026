@@ -12,6 +12,7 @@ from .decorators import doctor_required, patient_required
 from .forms import RoleRegistrationForm
 from .models import PatientProfile, DoctorProfile
 
+
 def register_view(request):
     if request.method == 'POST':
         form = RoleRegistrationForm(request.POST)
