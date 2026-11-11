@@ -673,11 +673,20 @@ class CourseCreateUpdateTests(TestCase):
             description="Mine.",
             category=self.category,
         )
+
+        Course.objects.create(
+            title="Lina's second course",
+            instructor=self.instructor,
+            description="Another course of mine.",
+            category=self.category,
+        )
+
         self.login("lina")
         response = self.client.get(reverse("studio"))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Lina&#x27;s course")
+        self.assertContains(response, "Lina&#x27;s second course")
         self.assertNotContains(response, "Omar&#x27;s course")
 
     def test_studio_requires_instructor_role(self):
