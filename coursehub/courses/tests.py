@@ -106,7 +106,6 @@ class CourseListViewTests(TestCase):
         response = self.client.get(reverse('courses:list'))
         self.assertEqual(response.status_code, 200)
 
-
 class HomeViewTests(TestCase):
     def setUp(self):
         self.omar = get_user_model().objects.create_user(
@@ -278,6 +277,8 @@ class CurriculumCrudTests(TestCase):
     def login_student(self):
         self.client.login(username="student", password="testpass123")
 
+    # ----- curriculum page ------------------------------------------------
+
     def test_curriculum_shows_module_and_lesson_actions(self):
         self.login_owner()
         response = self.client.get(
@@ -310,6 +311,8 @@ class CurriculumCrudTests(TestCase):
             response,
             reverse("courses:lesson_delete", args=[self.lesson.id]),
         )
+
+    # ----- modules --------------------------------------------------------
 
     def test_module_create_form_loads(self):
         self.login_owner()
@@ -427,6 +430,8 @@ class CurriculumCrudTests(TestCase):
         self.assertEqual(response.status_code, 404)
         self.assertTrue(Module.objects.filter(id=self.module.id).exists())
 
+    # ----- lessons --------------------------------------------------------
+
     def test_lesson_create_form_loads(self):
         self.login_owner()
         response = self.client.get(
@@ -537,7 +542,6 @@ class CurriculumCrudTests(TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertTrue(Lesson.objects.filter(id=self.lesson.id).exists())
 
-
 class CourseCreateUpdateTests(TestCase):
     """Course create/update views for instructors (AB#3301)."""
 
@@ -581,12 +585,16 @@ class CourseCreateUpdateTests(TestCase):
         data.update(overrides)
         return data
 
+    # ----- seeding --------------------------------------------------------
+
     def test_categories_are_seeded(self):
         names = set(Category.objects.values_list("name", flat=True))
         self.assertEqual(
             names,
             {"Web Development", "Cybersecurity", "AI", "Data"},
         )
+
+    # ----- create ---------------------------------------------------------
 
     def test_create_form_loads_for_instructor(self):
         self.login("lina")
@@ -669,6 +677,8 @@ class CourseCreateUpdateTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertIn("/login/", response.url)
 
+    # ----- update ---------------------------------------------------------
+
     def test_own_course_form_is_prefilled(self):
         own_course = Course.objects.create(
             title="My course",
@@ -730,6 +740,8 @@ class CourseCreateUpdateTests(TestCase):
 
         self.assertEqual(response.status_code, 403)
 
+    # ----- studio ---------------------------------------------------------
+
     def test_studio_lists_only_own_courses(self):
         Course.objects.create(
             title="Lina's course",
@@ -772,7 +784,6 @@ class CourseCreateUpdateTests(TestCase):
             response,
             reverse("courses:curriculum", args=[course.pk]),
         )
-
 
 class ThumbnailSizeValidationTests(TestCase):
     def test_rejects_image_larger_than_2_mb(self):

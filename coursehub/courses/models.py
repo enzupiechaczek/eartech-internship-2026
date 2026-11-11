@@ -1,5 +1,5 @@
-from urllib.parse import parse_qs, urlparse
 import re
+from urllib.parse import parse_qs, urlparse
 
 from django.conf import settings
 from django.db import models
@@ -111,30 +111,26 @@ class Course(models.Model):
 
 
 class Module(models.Model):
-    course = models.ForeignKey(
-        "Course", on_delete=models.CASCADE, related_name="modules"
-    )
+    course = models.ForeignKey('Course', on_delete=models.CASCADE, related_name='modules')
     title = models.CharField(max_length=255)
     order = models.PositiveIntegerField(default=0)
 
     class Meta:
-        ordering = ["order"]
+        ordering = ['order']
 
     def __str__(self):
         return f"{self.course.title} - {self.title}"
 
 
 class Lesson(models.Model):
-    module = models.ForeignKey(
-        Module, on_delete=models.CASCADE, related_name="lessons"
-    )
+    module = models.ForeignKey(Module, on_delete=models.CASCADE, related_name='lessons')
     title = models.CharField(max_length=255)
     notes = models.TextField(blank=True)
     video_url = models.URLField(blank=True, null=True)
     order = models.PositiveIntegerField(default=0)
 
     class Meta:
-        ordering = ["order"]
+        ordering = ['order']
 
     @property
     def embed(self):
