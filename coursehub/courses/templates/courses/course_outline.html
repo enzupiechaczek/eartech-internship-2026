@@ -116,9 +116,15 @@
                 Ready to start learning?
             </p>
             <div class="outline-cta-actions">
-                <span class="home-btn home-btn-primary">
-                    Enroll Now
-                </span>
+                {# Task 3314 (PR #83) supplies this endpoint as enrollments:enroll_course. #}
+                <form class="outline-enroll-form"
+                      method="post"
+                      action="/enrollments/{{ course.id }}/">
+                    {% csrf_token %}
+                    <button type="submit" class="home-btn home-btn-primary">
+                        Enroll Now
+                    </button>
+                </form>
             </div>
 
         {% else %}

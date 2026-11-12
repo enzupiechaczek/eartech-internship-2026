@@ -985,6 +985,17 @@ body {
     gap: 0.75rem;
 }
 
+.outline-enroll-form {
+    display: inline-flex;
+    margin: 0;
+}
+
+.outline-enroll-form .home-btn {
+    width: 100%;
+    font-family: inherit;
+    cursor: pointer;
+}
+
 @media (max-width: 767.98px) {
     .outline-header {
         padding: 1.6rem 1.35rem;
@@ -1004,6 +1015,10 @@ body {
     }
 
     .outline-cta-actions .home-btn {
+        width: 100%;
+    }
+
+    .outline-cta-actions .outline-enroll-form {
         width: 100%;
     }
 }

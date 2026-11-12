@@ -1,5 +1,6 @@
 from django import forms
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -56,7 +57,6 @@ def course_list(request):
     return HttpResponse('Courses app is working ✅')
 
 
-
 def course_outline(request, pk):
     """Public, read-only curriculum outline for a published course."""
     course = get_object_or_404(
@@ -94,6 +94,7 @@ def course_outline(request, pk):
     )
 
 
+@login_required
 def lesson_view(request, lesson_id):
     """Show lesson content only to the course instructor or enrolled students."""
     lesson = get_object_or_404(
@@ -116,9 +117,6 @@ def lesson_view(request, lesson_id):
     )
 
     if not is_instructor and not is_enrolled:
-        if not request.user.is_authenticated:
-            return redirect("login")
-
         raise PermissionDenied
 
     if course.status != Course.Status.PUBLISHED and not is_instructor:
