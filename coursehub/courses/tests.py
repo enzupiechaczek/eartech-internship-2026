@@ -1,12 +1,15 @@
 import io
 import os
+import sys
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
-from django.urls import reverse
+from django.http import HttpResponse
+from django.template.loader import render_to_string
+from django.test import TestCase, override_settings
+from django.urls import include, path, reverse
 from PIL import Image
 
 
@@ -783,3 +786,146 @@ class TogglePublishTests(TestCase):
         self.assertEqual(response.status_code, 403)
         self.course.refresh_from_db()
         self.assertEqual(self.course.status, "DRAFT")
+
+
+# Setup test URLconf for lesson_detail template tests if not yet in courses.urls
+import courses.urls
+
+_has_lesson_detail = any(
+    getattr(p, "name", None) == "lesson_detail" for p in courses.urls.urlpatterns
+)
+if not _has_lesson_detail:
+    _module = type(sys)("classroom_template_test_urls")
+    _module.urlpatterns = [
+        path(
+            "courses/",
+            include(
+                (
+                    list(courses.urls.urlpatterns)
+                    + [path("lessons/<int:pk>/", lambda r, pk: HttpResponse(), name="lesson_detail")],
+                    "courses",
+                )
+            ),
+        ),
+        path("", include("coursehub.urls")),
+    ]
+    sys.modules["classroom_template_test_urls"] = _module
+    CLASSROOM_TEST_URLCONF = "classroom_template_test_urls"
+else:
+    CLASSROOM_TEST_URLCONF = "coursehub.urls"
+
+
+@override_settings(ROOT_URLCONF=CLASSROOM_TEST_URLCONF)
+class LessonDetailTemplateTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.instructor = User.objects.create_user(
+            username="teacher_classroom",
+            password="password123",
+            role="INSTRUCTOR",
+        )
+        self.course = Course.objects.create(
+            title="Django Masterclass",
+            instructor=self.instructor,
+            status=Course.Status.PUBLISHED,
+        )
+        self.module_1 = Module.objects.create(
+            course=self.course,
+            title="Getting Started",
+            order=1,
+        )
+        self.module_2 = Module.objects.create(
+            course=self.course,
+            title="Advanced Topics",
+            order=2,
+        )
+        self.lesson_1 = Lesson.objects.create(
+            module=self.module_1,
+            title="Installation",
+            notes="Step 1: Install Python\nStep 2: Install Django",
+            order=1,
+        )
+        self.lesson_2 = Lesson.objects.create(
+            module=self.module_1,
+            title="Configuration",
+            notes="Set up settings.py",
+            order=2,
+        )
+        self.lesson_3 = Lesson.objects.create(
+            module=self.module_2,
+            title="Deployment",
+            notes="Deploy to production",
+            order=1,
+        )
+
+    def test_sidebar_renders_course_title_modules_and_lessons(self):
+        html = render_to_string(
+            "courses/lesson_detail.html",
+            {"course": self.course, "lesson": self.lesson_1},
+        )
+
+        self.assertIn("Django Masterclass", html)
+        self.assertIn("Getting Started", html)
+        self.assertIn("Advanced Topics", html)
+        self.assertIn("Installation", html)
+        self.assertIn("Configuration", html)
+        self.assertIn("Deployment", html)
+        self.assertIn('id="courseAccordion"', html)
+
+    def test_accordion_preserves_bootstrap_and_accessibility_attributes(self):
+        html = render_to_string(
+            "courses/lesson_detail.html",
+            {"course": self.course, "lesson": self.lesson_1},
+        )
+
+        self.assertIn('data-bs-toggle="collapse"', html)
+        self.assertIn(f'data-bs-target="#collapse{self.module_1.id}"', html)
+        self.assertIn('data-bs-parent="#courseAccordion"', html)
+        self.assertIn(f'aria-controls="collapse{self.module_1.id}"', html)
+        self.assertIn(f'aria-labelledby="heading{self.module_1.id}"', html)
+
+    def test_current_lesson_highlighted_and_module_expanded(self):
+        html = render_to_string(
+            "courses/lesson_detail.html",
+            {"course": self.course, "lesson": self.lesson_1},
+        )
+
+        # Active lesson item should have active class and white text
+        self.assertIn("active bg-primary text-white", html)
+
+        # Active lesson's module should have its collapse shown
+        self.assertIn(f'id="collapse{self.module_1.id}"', html)
+        self.assertIn("collapse show", html)
+
+        # Inactive module button should have 'collapsed' class
+        self.assertIn("accordion-button collapsed", html)
+
+    def test_video_embed_renders_iframe_when_embed_is_valid(self):
+        self.lesson_1.embed = "https://www.youtube.com/embed/dQw4w9WgXcQ"
+        html = render_to_string(
+            "courses/lesson_detail.html",
+            {"course": self.course, "lesson": self.lesson_1},
+        )
+
+        self.assertIn('<iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ"', html)
+        self.assertNotIn("Video link is not valid", html)
+
+    def test_video_embed_displays_fallback_when_embed_is_missing_or_invalid(self):
+        self.lesson_1.embed = None
+        html = render_to_string(
+            "courses/lesson_detail.html",
+            {"course": self.course, "lesson": self.lesson_1},
+        )
+
+        self.assertIn("Video link is not valid", html)
+        self.assertNotIn("<iframe", html)
+
+    def test_lesson_notes_rendered_with_linebreaks(self):
+        html = render_to_string(
+            "courses/lesson_detail.html",
+            {"course": self.course, "lesson": self.lesson_1},
+        )
+
+        self.assertIn("Installation", html)
+        self.assertIn("Step 1: Install Python<br>Step 2: Install Django", html)
+
