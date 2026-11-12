@@ -1,4 +1,3 @@
-
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
@@ -32,14 +31,8 @@ def enroll(request, course_id):
     )
 
     if created:
-        messages.success(
-            request,
-            f'You have successfully enrolled in "{course.title}".'
-        )
+        messages.success(request, "Enrolled!")
     else:
-        messages.info(
-            request,
-            f'You are already enrolled in "{course.title}".'
-        )
+        messages.info(request, "You are already enrolled.")
 
     return redirect("student_dashboard")
