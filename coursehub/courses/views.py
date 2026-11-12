@@ -8,8 +8,7 @@ from django.views.generic.edit import CreateView, UpdateView
 from accounts.decorators import InstructorRequiredMixin, instructor_required
 from .forms import CourseForm, LessonForm, ModuleForm
 from .models import Course, Lesson, Module
-from django.contrib.auth.decorators import login_required
-from enrollments.models import Enrollment
+
 
 class CourseFormMixin:
     """Shared configuration for the course create and update views."""
@@ -250,20 +249,3 @@ def toggle_publish(request, pk):
         course.status = Course.Status.PUBLISHED
     course.save(update_fields=["status"])
     return redirect("studio")
-
-@login_required
-def lesson_view(request, pk):
-    lesson = get_object_or_404(Lesson.objects.select_related("module__course"), pk=pk)
-    course = lesson.module.course
-    is_owner = course.instructor == request.user
-    
-    if not is_owner and not Enrollment.objects.filter(student=request.user, course=course).exists():
-        messages.warning(request, "Enroll to access this lesson.")
-        # Note: 'course_detail' view is not implemented in this file yet based on context, 
-        # but requested by the task hints. Ensure it exists or update the redirect name if needed.
-        return redirect("course_detail", course.pk)
-        
-    return render(request, "courses/lesson_detail.html", {
-        "lesson": lesson,
-        "course": course,
-    })

@@ -55,9 +55,4 @@ urlpatterns = [
         views.lesson_delete,
         name='lesson_delete',
     ),
-    # Classroom Layout (Lesson View)
-    path('learn/3/lesson/<int:pk>/'
-    , views.lesson_view,
-     name='lesson_detail'
-     ),
 ]
