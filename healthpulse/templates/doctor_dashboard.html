@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+    <h1>Welcome Dr. {{ request.user.username }}</h1>
+
+    <h2>Quick Links</h2>
+
+    <ul>
+        <li>
+            <a href="{% url 'doctor_dashboard' %}">
+                My Dashboard
+            </a>
+        </li>
+
+        <li>
+            <a href="{% url 'pending_requests' %}">
+                Pending Requests
+            </a>
+        </li>
+
+        <li>
+            <a href="{% url 'patient_dashboard' %}">
+                Patient Dashboard
+            </a>
+        </li>
+
+        <li>
+            <a href="{% url 'admin:index' %}">
+                Admin Panel
+            </a>
+        </li>
+    </ul>
+
+{% endblock %}

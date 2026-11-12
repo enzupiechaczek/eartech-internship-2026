@@ -1,0 +1,18 @@
+
+{% extends 'base.html' %}
+
+{% block content %}
+
+    <h1>Welcome {{ request.user.first_name }}</h1>
+
+    <h2>Patient Demographics</h2>
+
+    <p><strong>Username:</strong> {{ request.user.username }}</p>
+
+    <p><strong>First Name:</strong> {{ request.user.first_name }}</p>
+
+    <p><strong>Last Name:</strong> {{ request.user.last_name }}</p>
+
+    <p><strong>Email:</strong> {{ request.user.email }}</p>
+
+{% endblock %}

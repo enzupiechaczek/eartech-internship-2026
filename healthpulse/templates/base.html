@@ -1,9 +1,13 @@
+<<<<<<< HEAD
 
+=======
+>>>>>>> f625a505bb20c8dfee96b4679ce831f48879c7d6
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<<<<<<< HEAD
     <title>{% block title %}HealthPulse{% endblock %}</title>
 
     <style>
@@ -109,3 +113,23 @@
 
 </body>
 </html>
+=======
+    <title>HealthPulse</title>
+</head>
+<body>
+    <nav class="navbar navbar-dark" style="background: #0f6c6c; padding: 1rem;">
+        <a class="navbar-brand" href="/" style="color: white; text-decoration: none; font-size: 1.25rem;">HealthPulse</a>
+        <form method="post" action="{% url 'logout' %}" style="display: inline; float: right;">
+        {% csrf_token %}
+        <button type="submit">Logout</button>
+        </form>
+    </nav>
+    <main class="container" style="padding: 2rem;">
+        {% block content %}
+        <p>HealthPulse Login / Register</p>
+        <p>(page content)</p>
+        {% endblock %}
+    </main>
+</body>
+</html>
+>>>>>>> f625a505bb20c8dfee96b4679ce831f48879c7d6
