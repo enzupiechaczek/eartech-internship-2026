@@ -4,7 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import redirect
 
-from .models import User
+from accounts.models import User
 
 
 def role_required(*roles):
@@ -31,3 +31,4 @@ def role_required(*roles):
 
 doctor_required = role_required(User.Role.DOCTOR)
 patient_required = role_required(User.Role.PATIENT)
+
