@@ -1,5 +1,49 @@
+import re
+from urllib.parse import parse_qs, urlparse
+
 from django.conf import settings
 from django.db import models
+
+
+def embed_url(video_url):
+    if not video_url:
+        return None
+
+    try:
+        parsed = urlparse(video_url)
+    except ValueError:
+        return None
+
+    host = (parsed.netloc or parsed.path).lower().replace("www.", "")
+    if not host:
+        return None
+
+    if host in {"youtube.com", "m.youtube.com"} or host.endswith(".youtube.com"):
+        video_id = parse_qs(parsed.query).get("v", [None])[0]
+        if not video_id:
+            video_id = parsed.path.strip("/").split("/embed/")[-1].split("/")[0]
+        if not video_id:
+            video_id = parsed.path.strip("/").split("/shorts/")[-1].split("/")[0]
+        if video_id and re.fullmatch(r"[A-Za-z0-9_-]+", video_id):
+            return f"https://www.youtube.com/embed/{video_id}"
+        return None
+
+    if host == "youtu.be" or host.endswith(".youtu.be"):
+        video_id = parsed.path.strip("/").split("/")[0]
+        if video_id and re.fullmatch(r"[A-Za-z0-9_-]+", video_id):
+            return f"https://www.youtube.com/embed/{video_id}"
+        return None
+
+    if host in {"vimeo.com", "player.vimeo.com"} or host.endswith(".vimeo.com"):
+        path = parsed.path.strip("/")
+        if path.startswith("video/"):
+            path = path.replace("video/", "", 1)
+        video_id = path.split("/")[0]
+        if video_id and re.fullmatch(r"\d+", video_id):
+            return f"https://player.vimeo.com/video/{video_id}"
+        return None
+
+    return None
 
 
 class Category(models.Model):
@@ -64,8 +108,8 @@ class Course(models.Model):
 
     def __str__(self):
         return self.title
-    
-    
+
+
 class Module(models.Model):
     course = models.ForeignKey('Course', on_delete=models.CASCADE, related_name='modules')
     title = models.CharField(max_length=255)
@@ -87,6 +131,10 @@ class Lesson(models.Model):
 
     class Meta:
         ordering = ['order']
+
+    @property
+    def embed(self):
+        return embed_url(self.video_url)
 
     def __str__(self):
         return f"{self.module.title} - {self.title}"
