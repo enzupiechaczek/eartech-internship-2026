@@ -1,0 +1,106 @@
+
+{% extends "base.html" %}
+
+{% block title %}My Learning | CourseHub{% endblock %}
+
+{% block content %}
+
+<div class="container py-5">
+
+    <div class="mb-4">
+        <h2>My Learning</h2>
+        <p class="text-muted">
+            Welcome back,
+            {{ request.user.first_name|default:request.user.username }}.
+            Continue learning where you left off.
+        </p>
+    </div>
+
+    <div class="row g-4">
+
+        {% for enrollment in enrollments %}
+
+        <div class="col-md-6 col-lg-4">
+
+            <div class="card h-100 shadow-sm">
+
+                {% if enrollment.course.thumbnail %}
+                    <img
+                        src="{{ enrollment.course.thumbnail.url }}"
+                        class="card-img-top"
+                        style="height:180px;object-fit:cover"
+                        alt="{{ enrollment.course.title }}"
+                    >
+                {% endif %}
+
+                <div class="card-body">
+
+                    <h5 class="card-title">
+                        {{ enrollment.course.title }}
+                    </h5>
+
+                    <p class="text-muted">
+                        {{ enrollment.course.instructor.get_full_name }}
+                    </p>
+
+                    <div class="d-flex justify-content-between mb-2">
+                        <small>Course Progress</small>
+
+                        <strong>
+                            {{ enrollment.progress_percentage }}%
+                        </strong>
+                    </div>
+
+                    <div
+                        class="progress mb-3"
+                        role="progressbar"
+                        aria-valuenow="{{ enrollment.progress_percentage }}"
+                        aria-valuemin="0"
+                        aria-valuemax="100"
+                    >
+                        <div
+                            class="progress-bar"
+                            style="width:{{ enrollment.progress_percentage }}%"
+                        ></div>
+                    </div>
+
+                    <p class="small text-muted">
+                        {{ enrollment.completed_lessons }}
+                        / {{ enrollment.total_lessons }}
+                        lessons completed
+                    </p>
+
+                    <a
+                        href="{% url 'enrollments:course_detail' enrollment.pk %}"
+                        class="btn btn-primary w-100"
+                    >
+                        Start Course
+                    </a>
+
+                </div>
+            </div>
+
+        </div>
+
+        {% empty %}
+
+        <div class="col-12">
+
+            <div class="alert alert-info">
+                You haven't enrolled in any courses yet.
+                Explore our courses to get started!
+            </div>
+
+            <a href="{% url 'home' %}" class="btn btn-primary">
+                Browse Courses
+            </a>
+
+        </div>
+
+        {% endfor %}
+
+    </div>
+
+</div>
+
+{% endblock %}
