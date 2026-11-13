@@ -71,30 +71,30 @@ class Enrollment(models.Model):
         )
 
 
-class LessonProgress(models.Model):
-    enrollment = models.ForeignKey(
-        Enrollment,
-        on_delete=models.CASCADE,
-        related_name="lesson_progress"
-    )
+# class LessonProgress(models.Model):
+#     enrollment = models.ForeignKey(
+#         Enrollment,
+#         on_delete=models.CASCADE,
+#         related_name="lesson_progress"
+#     )
 
-    lesson = models.ForeignKey(
-        "courses.Lesson",
-        on_delete=models.CASCADE,
-        related_name="student_progress"
-    )
+#     lesson = models.ForeignKey(
+#         "courses.Lesson",
+#         on_delete=models.CASCADE,
+#         related_name="student_progress"
+#     )
 
-    completed = models.BooleanField(default=False)
+#     completed = models.BooleanField(default=False)
 
-    completed_at = models.DateTimeField(
-        null=True,
-        blank=True
-    )
+#     completed_at = models.DateTimeField(
+#         null=True,
+#         blank=True
+#     )
 
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["enrollment", "lesson"],
-                name="unique_enrollment_lesson_progress"
-            )
-        ]
+#     class Meta:
+#         constraints = [
+#             models.UniqueConstraint(
+#                 fields=["enrollment", "lesson"],
+#                 name="unique_enrollment_lesson_progress"
+#             )
+#         ]
