@@ -14,7 +14,84 @@ from PIL import Image
 from enrollments.models import Enrollment
 
 from .forms import MAX_THUMBNAIL_SIZE, validate_thumbnail_size
-from .models import Category, Course, Module, Lesson
+from .models import Category, Course, Module, Lesson, embed_url
+
+
+class LessonEmbedUrlTests(TestCase):
+    def test_youtube_watch_url(self):
+        self.assertEqual(
+            embed_url("https://www.youtube.com/watch?v=dQw4w9WgXcQ"),
+            "https://www.youtube.com/embed/dQw4w9WgXcQ",
+        )
+
+    def test_youtu_be_url(self):
+        self.assertEqual(
+            embed_url("https://youtu.be/dQw4w9WgXcQ"),
+            "https://www.youtube.com/embed/dQw4w9WgXcQ",
+        )
+
+    def test_vimeo_url(self):
+        self.assertEqual(
+            embed_url("https://vimeo.com/123456789"),
+            "https://player.vimeo.com/video/123456789",
+        )
+
+    def test_invalid_url_returns_none(self):
+        self.assertIsNone(embed_url("https://example.com/not-a-video"))
+
+    def test_curriculum_shows_embed_for_valid_video(self):
+        User = get_user_model()
+        instructor = User.objects.create_user(
+            username="owner",
+            password="testpass123",
+            role="INSTRUCTOR",
+        )
+        course = Course.objects.create(
+            title="Django for Beginners",
+            instructor=instructor,
+            status=Course.Status.PUBLISHED,
+        )
+        module = Module.objects.create(course=course, title="Intro", order=1)
+        Lesson.objects.create(
+            module=module,
+            title="Lesson 1",
+            notes="Intro notes",
+            video_url="https://youtu.be/dQw4w9WgXcQ",
+            order=1,
+        )
+
+        self.client.login(username="owner", password="testpass123")
+        response = self.client.get(reverse("courses:curriculum", args=[course.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "https://www.youtube.com/embed/dQw4w9WgXcQ")
+        self.assertContains(response, "<iframe")
+
+    def test_curriculum_shows_friendly_message_for_invalid_video(self):
+        User = get_user_model()
+        instructor = User.objects.create_user(
+            username="owner2",
+            password="testpass123",
+            role="INSTRUCTOR",
+        )
+        course = Course.objects.create(
+            title="Invalid Video Course",
+            instructor=instructor,
+            status=Course.Status.PUBLISHED,
+        )
+        module = Module.objects.create(course=course, title="Intro", order=1)
+        Lesson.objects.create(
+            module=module,
+            title="Broken Lesson",
+            notes="Oops",
+            video_url="https://example.com/not-a-video",
+            order=1,
+        )
+
+        self.client.login(username="owner2", password="testpass123")
+        response = self.client.get(reverse("courses:curriculum", args=[course.id]))
+
+        self.assertContains(response, "Video link is not valid")
 
 
 class AboutPageTests(TestCase):
@@ -89,7 +166,6 @@ class HomeViewTests(TestCase):
     def test_empty_state(self):
         response = self.client.get(reverse("home"))
         self.assertContains(response, "No courses yet.")
-
 
 
 class CourseCurriculumTests(TestCase):
