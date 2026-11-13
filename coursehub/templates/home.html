@@ -47,7 +47,7 @@
     <div class="home-grid">
         {% for c in courses %}
             <article class="home-card">
-                <div class="home-card-media">
+                <a class="home-card-media" href="{% url 'courses:outline' c.pk %}">
                     <img
                         src="{% if c.thumbnail %}{{ c.thumbnail.url }}{% else %}https://placehold.co/600x338/e2e8f0/64748b?text=Course{% endif %}"
                         alt="{{ c.title }}"
@@ -55,10 +55,12 @@
                     {% if c.category %}
                         <span class="home-badge">{{ c.category.name }}</span>
                     {% endif %}
-                </div>
+                </a>
 
                 <div class="home-card-body">
-                    <h3 class="home-card-title">{{ c.title }}</h3>
+                    <h3 class="home-card-title">
+                        <a href="{% url 'courses:outline' c.pk %}">{{ c.title }}</a>
+                    </h3>
                     {% if c.subtitle %}
                         <p class="home-card-sub">{{ c.subtitle|truncatechars:90 }}</p>
                     {% endif %}
@@ -71,6 +73,7 @@
                     <span class="home-price{% if not c.price %} home-price-free{% endif %}">
                         {% if c.price > 0 %}${{ c.price|floatformat:2 }}{% else %}Free{% endif %}
                     </span>
+                    <a class="home-card-cta" href="{% url 'courses:outline' c.pk %}">View outline &rarr;</a>
                 </div>
             </article>
         {% empty %}

@@ -1,6 +1,7 @@
 import io
 import os
 from decimal import Decimal
+from urllib.parse import parse_qs, urlparse
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -9,6 +10,8 @@ from django.test import TestCase
 from django.urls import reverse
 from PIL import Image
 
+
+from enrollments.models import Enrollment
 
 from .forms import MAX_THUMBNAIL_SIZE, validate_thumbnail_size
 from .models import Category, Course, Module, Lesson
@@ -783,3 +786,364 @@ class TogglePublishTests(TestCase):
         self.assertEqual(response.status_code, 403)
         self.course.refresh_from_db()
         self.assertEqual(self.course.status, "DRAFT")
+
+
+class PublicCourseOutlineTests(TestCase):
+    """The public curriculum outline for a published course (AB#3313)."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.instructor = User.objects.create_user(
+            username="lina",
+            password="pass",
+            role="INSTRUCTOR",
+            first_name="Lina",
+            last_name="Haddad",
+        )
+        self.course = Course.objects.create(
+            title="Django for Beginners",
+            subtitle="Build your first web app",
+            description="A beginner friendly Django course.",
+            instructor=self.instructor,
+            status=Course.Status.PUBLISHED,
+        )
+        self.second_module = Module.objects.create(
+            course=self.course, title="Models and data", order=2
+        )
+        self.first_module = Module.objects.create(
+            course=self.course, title="Getting started", order=1
+        )
+        self.second_lesson = Lesson.objects.create(
+            module=self.first_module, title="Install Django", order=2
+        )
+        self.first_lesson = Lesson.objects.create(
+            module=self.first_module, title="Meet Django", order=1
+        )
+
+    def outline_url(self, course=None):
+        return reverse("courses:outline", args=[(course or self.course).pk])
+
+    # ----- public access --------------------------------------------------
+
+    def test_guest_can_view_published_outline(self):
+        response = self.client.get(self.outline_url())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "courses/course_outline.html")
+        self.assertContains(response, "Django for Beginners")
+        self.assertContains(response, "Build your first web app")
+        self.assertContains(response, "Lina Haddad")
+        self.assertContains(response, "Getting started")
+        self.assertContains(response, "Models and data")
+        self.assertContains(response, "Meet Django")
+        self.assertContains(response, "Install Django")
+
+    def test_outline_shows_module_and_lesson_totals(self):
+        response = self.client.get(self.outline_url())
+
+        self.assertEqual(response.context["lesson_count"], 2)
+        self.assertContains(response, "2 modules")
+        self.assertContains(response, "2 lessons")
+
+    def test_modules_and_lessons_are_ordered(self):
+        content = self.client.get(self.outline_url()).content.decode()
+
+        self.assertLess(
+            content.index("Getting started"), content.index("Models and data")
+        )
+        self.assertLess(content.index("Meet Django"), content.index("Install Django"))
+
+    def test_unknown_course_returns_404(self):
+        response = self.client.get(
+            reverse("courses:outline", args=[99999])
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    # ----- draft courses stay private ------------------------------------
+
+    def test_draft_course_returns_404_for_guest(self):
+        draft = Course.objects.create(
+            title="Secret draft",
+            instructor=self.instructor,
+            status=Course.Status.DRAFT,
+        )
+
+        response = self.client.get(self.outline_url(draft))
+
+        self.assertEqual(response.status_code, 404)
+        self.assertNotContains(response, "Secret draft", status_code=404)
+
+    def test_draft_course_returns_404_for_instructor(self):
+        draft = Course.objects.create(
+            title="Secret draft",
+            instructor=self.instructor,
+            status=Course.Status.DRAFT,
+        )
+        self.client.login(username="lina", password="pass")
+
+        response = self.client.get(self.outline_url(draft))
+
+        self.assertEqual(response.status_code, 404)
+
+    # ----- read-only ------------------------------------------------------
+
+    def test_outline_has_no_instructor_edit_controls(self):
+        self.client.login(username="lina", password="pass")
+        response = self.client.get(self.outline_url())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "+ Add Module")
+        self.assertNotContains(response, "+ Lesson")
+        self.assertNotContains(
+            response, reverse("courses:module_create", args=[self.course.pk])
+        )
+        self.assertNotContains(
+            response, reverse("courses:module_edit", args=[self.first_module.pk])
+        )
+        self.assertNotContains(
+            response, reverse("courses:module_delete", args=[self.first_module.pk])
+        )
+        self.assertNotContains(
+            response, reverse("courses:lesson_create", args=[self.first_module.pk])
+        )
+        self.assertNotContains(
+            response, reverse("courses:lesson_edit", args=[self.first_lesson.pk])
+        )
+        self.assertNotContains(
+            response, reverse("courses:lesson_delete", args=[self.first_lesson.pk])
+        )
+
+    def test_empty_outline_has_a_friendly_message(self):
+        empty_course = Course.objects.create(
+            title="Fresh course",
+            instructor=self.instructor,
+            status=Course.Status.PUBLISHED,
+        )
+
+        response = self.client.get(self.outline_url(empty_course))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            "This course is published but its outline is still being built.",
+        )
+
+    # ----- entry point ----------------------------------------------------
+
+    def test_home_cards_link_to_the_outline(self):
+        response = self.client.get(reverse("home"))
+
+        self.assertContains(response, self.outline_url())
+
+
+class CourseOutlineCTATests(TestCase):
+    """Test course outline buttons for different user states (AB#3313)."""
+
+    def setUp(self):
+        User = get_user_model()
+
+        self.instructor = User.objects.create_user(
+            username="cta_instructor",
+            password="testpass123",
+            role="INSTRUCTOR",
+        )
+
+        self.student = User.objects.create_user(
+            username="cta_student",
+            password="testpass123",
+            role="STUDENT",
+        )
+
+        self.course = Course.objects.create(
+            title="Django Course",
+            description="Learn Django step by step.",
+            instructor=self.instructor,
+            status=Course.Status.PUBLISHED,
+        )
+
+        self.module = Module.objects.create(
+            course=self.course,
+            title="Introduction",
+            order=1,
+        )
+
+        self.lesson = Lesson.objects.create(
+            module=self.module,
+            title="Getting Started",
+            notes="Introduction to Django.",
+            order=1,
+        )
+
+        self.url = reverse(
+            "courses:outline",
+            args=[self.course.id],
+        )
+
+    def test_instructor_sees_manage_course_button(self):
+        self.client.force_login(self.instructor)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Manage Course")
+        self.assertContains(
+            response,
+            reverse("courses:curriculum", args=[self.course.id]),
+        )
+
+    def test_enrolled_student_sees_continue_learning_button(self):
+        Enrollment.objects.create(
+            student=self.student,
+            course=self.course,
+        )
+
+        self.client.force_login(self.student)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Continue Learning")
+        self.assertContains(
+            response,
+            reverse("courses:lesson_view", args=[self.lesson.id]),
+        )
+
+    def test_non_enrolled_student_sees_enroll_form(self):
+        self.client.force_login(self.student)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Enroll Now")
+        self.assertContains(response, 'method="post"')
+        self.assertContains(
+            response,
+            f'action="/enrollments/{self.course.id}/"',
+        )
+        self.assertContains(response, "csrfmiddlewaretoken")
+
+    def test_anonymous_user_sees_login_and_register_buttons(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Log in")
+        self.assertContains(response, "Create a free account")
+
+
+class LessonAccessTests(TestCase):
+    """Lesson content is protected by course access checks (AB#3313)."""
+
+    def setUp(self):
+        User = get_user_model()
+
+        self.instructor = User.objects.create_user(
+            username="lesson_instructor",
+            password="testpass123",
+            role="INSTRUCTOR",
+        )
+
+        self.student = User.objects.create_user(
+            username="lesson_student",
+            password="testpass123",
+            role="STUDENT",
+        )
+
+        self.other_student = User.objects.create_user(
+            username="other_student",
+            password="testpass123",
+            role="STUDENT",
+        )
+
+        self.course = Course.objects.create(
+            title="Python Course",
+            description="Python lessons",
+            instructor=self.instructor,
+            status=Course.Status.PUBLISHED,
+        )
+
+        self.module = Module.objects.create(
+            course=self.course,
+            title="Introduction",
+            order=1,
+        )
+
+        self.lesson = Lesson.objects.create(
+            module=self.module,
+            title="First Lesson",
+            notes="This is protected lesson content.",
+            order=1,
+        )
+
+        self.url = reverse(
+            "courses:lesson_view",
+            args=[self.lesson.pk],
+        )
+
+    def test_instructor_can_view_lesson(self):
+        self.client.login(
+            username="lesson_instructor",
+            password="testpass123",
+        )
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "This is protected lesson content.")
+
+    def test_enrolled_student_can_view_lesson(self):
+        Enrollment.objects.create(
+            student=self.student,
+            course=self.course,
+        )
+
+        self.client.login(
+            username="lesson_student",
+            password="testpass123",
+        )
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "This is protected lesson content.")
+
+    def test_non_enrolled_student_gets_403(self):
+        self.client.login(
+            username="other_student",
+            password="testpass123",
+        )
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 403)
+        self.assertNotContains(
+            response,
+            "This is protected lesson content.",
+            status_code=403,
+        )
+
+    def test_anonymous_user_is_redirected_to_login(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 302)
+        parsed = urlparse(response.url)
+        self.assertEqual(parsed.path, reverse("login"))
+        self.assertEqual(parse_qs(parsed.query)["next"], [self.url])
+
+    def test_enrolled_student_cannot_view_draft_course_lesson(self):
+        self.course.status = Course.Status.DRAFT
+        self.course.save()
+
+        Enrollment.objects.create(
+            student=self.student,
+            course=self.course,
+        )
+
+        self.client.login(
+            username="lesson_student",
+            password="testpass123",
+        )
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 403)
