@@ -40,6 +40,7 @@ class StudentDashboardTests(TestCase):
         self.instructor = User.objects.create_user(
             username="instructor1",
             password="testpass123",
+            role="INSTRUCTOR",
         )
 
     def test_anonymous_user_redirected_to_login(self):
@@ -66,7 +67,9 @@ class StudentDashboardTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "No courses")
+        self.assertContains(response,
+                            "You haven't enrolled in any courses yet."
+                            )
 
     def test_student_sees_only_own_enrollments(self):
         own_course = Course.objects.create(

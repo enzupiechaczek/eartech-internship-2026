@@ -35,12 +35,6 @@ class Enrollment(models.Model):
         )["total"] or 0
 
     @property
-    def completed_lessons(self):
-        return self.lesson_progress.filter(
-            completed=True
-        ).count()
-
-    @property
     def progress_percentage(self):
         total = self.total_lessons
 

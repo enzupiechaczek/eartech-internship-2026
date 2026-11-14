@@ -21,7 +21,6 @@ class StudentDashboardView(StudentRequiredMixin, ListView):
                 "course",
                 "course__instructor",
             )
-            .prefetch_related("lesson_progress")
             .order_by("-enrolled_at")
         )
 
@@ -39,6 +38,5 @@ class StudentCourseDetailView(StudentRequiredMixin, DetailView):
             .select_related("course", "course__instructor")
             .prefetch_related(
                 "course__modules__lessons",
-                "lesson_progress",
             )
         )
