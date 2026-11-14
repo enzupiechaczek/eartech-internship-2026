@@ -40,7 +40,7 @@
                     </h5>
 
                     <p class="text-muted">
-                        {{ enrollment.course.instructor.get_full_name }}
+                        {{ enrollment.course.instructor.get_full_name|default:enrollment.course.instructor.username }}
                     </p>
 
                     <div class="d-flex justify-content-between mb-2">

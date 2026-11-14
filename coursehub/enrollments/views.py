@@ -28,7 +28,7 @@ class StudentDashboardView(StudentRequiredMixin, ListView):
 
 class StudentCourseDetailView(StudentRequiredMixin, DetailView):
     model = Enrollment
-    template_name = "enrollments/course_ details.html"
+    template_name = "enrollments/course_ detail.html"
     context_object_name = "enrollment"
     pk_url_kwarg = "enrollment_id"
 
