@@ -4,7 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import redirect
 
-from .models import User
+from accounts.models import User
 
 
 def role_required(*roles):

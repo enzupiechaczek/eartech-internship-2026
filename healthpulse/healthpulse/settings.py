@@ -20,6 +20,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = 'django-insecure-qg016-z*frw5j$0c-*yii=_6zub(7olnlvqd)1%kp9rfg2zads'
 SECRET_KEY = 'django-insecure-l=jyt0+-it87j8eaxh*u^fzre3ucp48m#zdmg_07f+0akpypxb'
 
 # SECURITY WARNING: don't run with debug turned on in production!
@@ -37,6 +38,11 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
+    'accounts',
+    'core',
+    'appointments',
+    'records',
 ]
 
 MIDDLEWARE = [
@@ -54,6 +60,7 @@ ROOT_URLCONF = 'healthpulse.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [BASE_DIR / 'templates'],
         'DIRS': [],
         'APP_DIRS': True,
         'OPTIONS': {
@@ -125,3 +132,4 @@ MAILERS = {
         'BACKEND': 'django.core.mail.backends.console.EmailBackend',
     },
 }
+AUTH_USER_MODEL= "accounts.User"

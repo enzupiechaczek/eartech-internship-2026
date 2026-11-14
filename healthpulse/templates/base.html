@@ -1,8 +1,119 @@
+<<<<<<< HEAD
+
+=======
+>>>>>>> f625a505bb20c8dfee96b4679ce831f48879c7d6
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<<<<<<< HEAD
+    <title>{% block title %}HealthPulse{% endblock %}</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f8f8;
+            color: #334155;
+            min-height: 100vh;
+        }
+
+        .navbar {
+            background-color: #ffffff;
+            padding: 18px 7%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e2e8e8;
+        }
+
+        .logo {
+            color: #168b83;
+            font-size: 24px;
+            font-weight: bold;
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 25px;
+            list-style: none;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: #475569;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .nav-links a:hover {
+            color: #168b83;
+        }
+
+        .main-content {
+            max-width: 1200px;
+            margin: 35px auto;
+            padding: 0 25px;
+            min-height: 65vh;
+        }
+
+        footer {
+            background-color: #ffffff;
+            border-top: 1px solid #e2e8e8;
+            text-align: center;
+            padding: 20px;
+            color: #64748b;
+            font-size: 13px;
+        }
+
+        @media (max-width: 600px) {
+            .navbar {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .nav-links {
+                gap: 15px;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+        }
+    </style>
+
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+
+    <nav class="navbar">
+        <a href="#" class="logo">HealthPulse</a>
+
+        <ul class="nav-links">
+            <li><a href="#">Home</a></li>
+            <li><a href="#">Appointments</a></li>
+            <li><a href="#">Medical Records</a></li>
+        </ul>
+    </nav>
+
+    <main class="main-content">
+        {% block content %}
+        {% endblock %}
+    </main>
+
+    <footer>
+        &copy; 2026 HealthPulse. All rights reserved.
+    </footer>
+
+</body>
+</html>
+=======
     <title>HealthPulse</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
       rel="stylesheet">
@@ -24,3 +135,4 @@
     </main>
 </body>
 </html>
+>>>>>>> f625a505bb20c8dfee96b4679ce831f48879c7d6

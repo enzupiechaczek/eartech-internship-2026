@@ -1,0 +1,22 @@
+
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Book An Appointment</h2>
+
+    <p>
+        Book An Appointment With Dr. {{ doctor.user.get_full_name|default:doctor.user.username }}
+    </p>
+
+    <form method="POST">
+        {% csrf_token %}
+
+        {{ form.as_p }}
+
+        <button type="submit" class="btn btn-primary">
+            Request Appointment
+        </button>
+    </form>
+</div>
+{% endblock %}

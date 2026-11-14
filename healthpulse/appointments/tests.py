@@ -1,3 +1,8 @@
+<<<<<<< HEAD
+from django.test import TestCase
+
+# Create your tests here.
+=======
 from datetime import time, timedelta
 
 from django.test import TestCase
@@ -57,3 +62,4 @@ class PendingRequestsTests(TestCase):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 302)
         self.assertIn(reverse('login'), response.url)
+>>>>>>> f625a505bb20c8dfee96b4679ce831f48879c7d6

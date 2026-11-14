@@ -38,6 +38,12 @@ urlpatterns = [
 
     # Doctor directory
     path('doctors/', views.doctor_directory, name='doctor_directory'),
+       # Appointment booking
+    path(
+        'doctors/<int:doctor_id>/book/',
+        appointment_views.book,
+        name='book_appointment',
+    ),
     path('doctors/<int:pk>/', views.DoctorDetailView.as_view(), name='doctor_detail'),
 ]
 
