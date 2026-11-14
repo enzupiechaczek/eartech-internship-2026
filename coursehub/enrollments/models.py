@@ -22,8 +22,9 @@ class Enrollment(models.Model):
             models.UniqueConstraint(
                 fields=["student", "course"],
                 name="unique_student_course_enrollment"
-            )
-        ]
+                )
+            ]
+                
 
     def __str__(self):
         return f"{self.student} -> {self.course}"
