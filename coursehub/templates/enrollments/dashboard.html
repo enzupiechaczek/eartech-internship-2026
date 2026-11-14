@@ -47,7 +47,7 @@
                         <small>Course Progress</small>
 
                         <strong>
-                            {{ enrollment.progress_percentage }}%
+                            {{ enrollment.progress_percentage | default:'0'}}%
                         </strong>
                     </div>
 
@@ -60,12 +60,12 @@
                     >
                         <div
                             class="progress-bar"
-                            style="width:{{ enrollment.progress_percentage }}%"
+                            style="width:{{ enrollment.progress_percentage | default:'0' }}%"
                         ></div>
                     </div>
 
                     <p class="small text-muted">
-                        {{ enrollment.completed_lessons }}
+                        {{ enrollment.completed_lessons | default:'0' }}
                         / {{ enrollment.total_lessons }}
                         lessons completed
                     </p>
