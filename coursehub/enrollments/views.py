@@ -28,17 +28,6 @@ class StudentDashboardView(StudentRequiredMixin, ListView):
                 "course__instructor",
                 "course__category",
             )
-            .annotate(
-                total_lessons=Count(
-                    "course__modules__lessons",
-                    distinct=True,
-                ),
-                completed_lessons=Count(
-                    "lesson_progress",
-                    filter=Q(lesson_progress__completed=True),
-                    distinct=True,
-                ),
-            )
             .order_by("-enrolled_at")
         )
 
