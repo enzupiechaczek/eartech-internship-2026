@@ -32,7 +32,9 @@
                         {% elif user.role == 'STUDENT' %}
                             <li class="nav-item">
                                 <!-- TODO: real URL in Sprint 2/3 -->
-                                <a class="nav-link" href="#">My Learning</a>
+                                <!-- <a class="nav-link" href="#">My Learning</a> -->
+                                <a class="nav-link"
+                                    href="{% url 'enrollments:student_dashboard' %}">My Learning</a>
                             </li>
                         {% endif %}
                         <li class="nav-item">
