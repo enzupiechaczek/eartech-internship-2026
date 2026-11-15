@@ -5,7 +5,8 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 from appointments.models import Appointment
-from core.models import DoctorProfile, PatientProfile, User
+from accounts.models import User
+from core.models import DoctorProfile, PatientProfile
 
 DEMO_PASSWORD = 'demo-pass-123'  # local development only
 
