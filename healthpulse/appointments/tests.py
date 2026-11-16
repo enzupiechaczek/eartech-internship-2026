@@ -4,7 +4,8 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from core.models import DoctorProfile, PatientProfile, User
+from accounts.models import User
+from core.models import DoctorProfile, PatientProfile
 
 from .models import Appointment
 
