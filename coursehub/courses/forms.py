@@ -24,6 +24,8 @@ class CourseForm(forms.ModelForm):
             "description",
             "thumbnail",
         ]
+
+    
     def clean_thumbnail(self):
         thumbnail = self.cleaned_data.get("thumbnail")
 
