@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Delete {{ object_type|lower }} | {{ course.title }}{% endblock %}
+
+{% block content %}
+
+<div class="container py-4" style="max-width: 640px;">
+
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a href="{% url 'courses:curriculum' course.id %}">{{ course.title }}</a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">
+                Delete {{ object_type|lower }}
+            </li>
+        </ol>
+    </nav>
+
+    <div class="card border-danger">
+        <div class="card-header bg-danger-subtle text-danger-emphasis">
+            <h4 class="mb-0">Delete {{ object_type|lower }}</h4>
+        </div>
+        <div class="card-body">
+            <p class="mb-3">
+                Are you sure you want to delete <strong>{{ object }}</strong>?
+            </p>
+
+            {% if object_type == "Module" %}
+                <p class="text-muted">
+                    Every lesson inside this module will be deleted as well.
+                </p>
+            {% endif %}
+
+            <form method="post" class="d-flex gap-2">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger">
+                    Delete {{ object_type|lower }}
+                </button>
+                <a class="btn btn-outline-secondary" href="{{ cancel_url }}">
+                    Cancel
+                </a>
+            </form>
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

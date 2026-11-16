@@ -1,11 +1,16 @@
-## What does this PR do?
+## Azure Boards task
+AB#
 
-## Related task / issue
+## What does this PR do?
 
 ## How was it tested?
 
+## Screenshot proof
+(Attach a screenshot of the expected result)
+
 ## Checklist
+- [ ] PR targets the correct sprint branch (e.g. team-a/sprint-1)
 - [ ] Branch is up to date with the target branch
-- [ ] Code runs locally and tests pass
+- [ ] Code runs locally and tested
 - [ ] No secrets, .env files or db.sqlite3 committed
-- [ ] Ready for Scrum Master review
+- [ ] Teammate review requested

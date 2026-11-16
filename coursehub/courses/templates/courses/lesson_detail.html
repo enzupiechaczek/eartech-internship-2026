@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}{{ lesson.title }} | {{ course.title }}{% endblock %}
+
+{% block content %}
+
+<div class="container py-4" style="max-width: 900px;">
+
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a href="{% url 'courses:outline' course.id %}">
+                    {{ course.title }}
+                </a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">
+                {{ lesson.title }}
+            </li>
+        </ol>
+    </nav>
+
+    <div class="card shadow-sm">
+        <div class="card-body p-4">
+
+            <h2 class="mb-3">{{ lesson.title }}</h2>
+
+            <hr>
+
+            {% if lesson.notes %}
+                <div class="mb-4">
+                    <h5>Lesson Content</h5>
+                    <div class="text-break">
+                        {{ lesson.notes|linebreaks }}
+                    </div>
+                </div>
+            {% endif %}
+
+            {% if lesson.video_url %}
+                <div class="mb-4">
+                    <h5>Lesson Video</h5>
+                    <a href="{{ lesson.video_url }}"
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       class="btn btn-primary">
+                        Watch Video
+                    </a>
+                </div>
+            {% endif %}
+
+            {% if not lesson.notes and not lesson.video_url %}
+                <p class="text-muted">
+                    No lesson content is available yet.
+                </p>
+            {% endif %}
+
+            <hr>
+
+            <a href="{% url 'courses:outline' course.id %}"
+               class="btn btn-outline-secondary">
+                Back to Course Outline
+            </a>
+
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

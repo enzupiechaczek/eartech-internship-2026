@@ -8,3 +8,6 @@ media/
 staticfiles/
 .idea/
 .vscode/
+
+# Uploaded course thumbnails
+coursehub/thumbnails/

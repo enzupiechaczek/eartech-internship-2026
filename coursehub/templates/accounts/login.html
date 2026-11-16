@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Log in | CourseHub{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+    <div class="auth-card">
+
+        <aside class="auth-aside">
+            <div>
+                <a class="auth-brand" href="{% url 'home' %}">CourseHub</a>
+                <h2 class="auth-aside-title">Welcome back.<br>Keep learning.</h2>
+                <p class="auth-aside-text">
+                    Pick up where you left off and keep building your skills.
+                </p>
+            </div>
+            <ul class="auth-list">
+                <li>Continue your enrolled courses</li>
+                <li>Track your progress</li>
+                <li>Learn at your own pace</li>
+            </ul>
+        </aside>
+
+        <section class="auth-panel">
+            <span class="auth-eyebrow">Sign in</span>
+            <h1 class="auth-title">Log in to CourseHub</h1>
+            <p class="auth-subtitle">Enter your username and password to continue.</p>
+
+            <form method="post" class="auth-form" novalidate>
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                    <div class="auth-alert" role="alert">
+                        {% for error in form.non_field_errors %}
+                            <div>{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+
+                {% for field in form %}
+                    <div class="auth-field{% if field.errors %} has-error{% endif %}">
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% for error in field.errors %}
+                            <div class="auth-error">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+
+                {% if next %}
+                    <input type="hidden" name="next" value="{{ next }}">
+                {% endif %}
+
+                <button type="submit" class="auth-submit">Log in</button>
+            </form>
+
+            <p class="auth-switch">
+                Don't have an account?
+                <a href="{% url 'register' %}">Create one</a>
+            </p>
+        </section>
+
+    </div>
+</div>
+{% endblock %}
