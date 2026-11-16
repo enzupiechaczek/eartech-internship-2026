@@ -1,4 +1,3 @@
-
 {% extends "base.html" %}
 
 {% block title %}CourseHub | Learn from real instructors{% endblock %}
@@ -48,7 +47,7 @@
     <div class="home-grid">
         {% for c in courses %}
             <article class="home-card">
-                <div class="home-card-media">
+                <a class="home-card-media" href="{% url 'courses:outline' c.pk %}">
                     <img
                         src="{% if c.thumbnail %}{{ c.thumbnail.url }}{% else %}https://placehold.co/600x338/e2e8f0/64748b?text=Course{% endif %}"
                         alt="{{ c.title }}"
@@ -56,11 +55,11 @@
                     {% if c.category %}
                         <span class="home-badge">{{ c.category.name }}</span>
                     {% endif %}
-                </div>
+                </a>
 
                 <div class="home-card-body">
                     <h3 class="home-card-title">
-                        <a href="{% url 'courses:detail' c.pk %}">
+                        <a href="{% url 'courses:outline' c.pk %}">
                             {{ c.title }}
                         </a>
                     </h3>
@@ -83,9 +82,7 @@
                             <span class="course-rating-score">
                                 {{ c.average_rating|floatformat:1 }}/5
                             </span>
-                            <span class="course-rating-count">
-                                ({{ c.reviews.count }} reviews)
-                            </span>
+                            <span class="course-rating-count">({{ c.review_count }} {% if c.review_count == 1 %}review{% else %}reviews{% endif %})</span>
                         {% else %}
                             <span class="course-rating-empty">No reviews yet</span>
                         {% endif %}
@@ -96,6 +93,7 @@
                     <span class="home-price{% if not c.price %} home-price-free{% endif %}">
                         {% if c.price > 0 %}${{ c.price|floatformat:2 }}{% else %}Free{% endif %}
                     </span>
+                    <a class="home-card-cta" href="{% url 'courses:outline' c.pk %}">View outline &rarr;</a>
                 </div>
             </article>
         {% empty %}

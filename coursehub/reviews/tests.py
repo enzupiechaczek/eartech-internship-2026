@@ -90,3 +90,31 @@ class CourseRatingDisplayTests(TestCase):
         self.assertEqual(home_response.status_code, 200)
         self.assertContains(detail_response, "No reviews yet")
         self.assertContains(home_response, "No reviews yet")
+
+    def test_homepage_displays_singular_review_label(self):
+        Review.objects.create(
+            course=self.course,
+            student=self.student_one,
+            rating=5,
+            comment="Excellent course",
+        )
+
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "(1 review)")
+        self.assertNotContains(response, "(1 reviews)")
+
+    def test_draft_course_detail_returns_404(self):
+        draft_course = Course.objects.create(
+            title="Draft Django Course",
+            instructor=self.instructor,
+            description="This course is not published.",
+            status=Course.Status.DRAFT,
+        )
+
+        response = self.client.get(
+            reverse("courses:detail", args=[draft_course.pk])
+        )
+
+        self.assertEqual(response.status_code, 404)
