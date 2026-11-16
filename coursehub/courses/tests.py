@@ -1,6 +1,9 @@
 import io
 import os
+import shutil
+import tempfile
 from decimal import Decimal
+from urllib.parse import parse_qs, urlparse
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -10,7 +13,9 @@ from django.urls import reverse
 from PIL import Image
 
 
-from .forms import MAX_THUMBNAIL_SIZE, validate_thumbnail_size
+from enrollments.models import Enrollment
+
+from .forms import CourseForm, MAX_THUMBNAIL_SIZE, validate_thumbnail_size
 from .models import Category, Course, Module, Lesson, embed_url
 
 TEMP_MEDIA_ROOT = tempfile.mkdtemp()
