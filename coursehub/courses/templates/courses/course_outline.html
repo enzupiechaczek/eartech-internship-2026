@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block title %}{{ course.title }} | Curriculum | CourseHub{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <a class="outline-back" href="{% url 'home' %}">&larr; Back to courses</a>
+
+    <header class="outline-header">
+        <span class="outline-eyebrow">Course curriculum</span>
+        <div class="outline-title-row">
+            <h1 class="outline-title">{{ course.title }}</h1>
+            {% if course.category %}
+                <span class="outline-badge">{{ course.category.name }}</span>
+            {% endif %}
+        </div>
+
+        {% if course.subtitle %}
+            <p class="outline-subtitle">{{ course.subtitle }}</p>
+        {% endif %}
+
+        <p class="outline-meta">
+            <span>by <strong>{{ course.instructor.get_full_name|default:course.instructor.username }}</strong></span>
+            <span class="outline-dot">&middot;</span>
+            <span class="outline-price{% if not course.price %} outline-price-free{% endif %}">
+                {% if course.price > 0 %}${{ course.price|floatformat:2 }}{% else %}Free{% endif %}
+            </span>
+        </p>
+
+        {% if course.description %}
+            <p class="outline-description">{{ course.description|linebreaksbr }}</p>
+        {% endif %}
+    </header>
+
+    <section class="outline-content">
+        <div class="outline-content-head">
+            <h2 class="outline-section-title">Course content</h2>
+            <p class="outline-count">
+                {{ modules|length }} module{{ modules|length|pluralize }}
+                <span class="outline-dot">&middot;</span>
+                {{ lesson_count }} lesson{{ lesson_count|pluralize }}
+            </p>
+        </div>
+
+        {% for module in modules %}
+            <article class="outline-module">
+                <div class="outline-module-head">
+                    <div>
+                        <span class="outline-module-index">Module {{ forloop.counter }}</span>
+                        <h3 class="outline-module-title">{{ module.title }}</h3>
+                    </div>
+                    <span class="outline-lesson-count">
+                        {{ module.lessons.all|length }} lesson{{ module.lessons.all|length|pluralize }}
+                    </span>
+                </div>
+
+                {% if module.lessons.all %}
+                    <ol class="outline-lessons">
+                        {% for lesson in module.lessons.all %}
+                            <li class="outline-lesson">
+                                <span class="outline-lesson-index">{{ forloop.counter }}</span>
+                                <span class="outline-lesson-title">{{ lesson.title }}</span>
+                            </li>
+                        {% endfor %}
+                    </ol>
+                {% else %}
+                    <p class="outline-module-empty">No lessons in this module yet.</p>
+                {% endif %}
+            </article>
+        {% empty %}
+            <div class="outline-empty-state">
+                <h3>No modules yet</h3>
+                <p>This course is published but its outline is still being built.</p>
+            </div>
+        {% endfor %}
+    </section>
+
+    <aside class="outline-cta">
+
+        {% if is_instructor %}
+            <p class="outline-cta-text">
+                You are the instructor of this course.
+            </p>
+            <div class="outline-cta-actions">
+                <a class="home-btn home-btn-primary"
+                   href="{% url 'courses:curriculum' course.id %}">
+                    Manage Course
+                </a>
+            </div>
+
+        {% elif is_enrolled %}
+            <p class="outline-cta-text">
+                Welcome back! Continue your learning.
+            </p>
+            <div class="outline-cta-actions">
+                {% with first_module=modules|first %}
+                    {% if first_module %}
+                        {% with first_lesson=first_module.lessons.all|first %}
+                            {% if first_lesson %}
+                                <a class="home-btn home-btn-primary"
+                                   href="{% url 'courses:lesson_view' first_lesson.id %}">
+                                    Continue Learning
+                                </a>
+                            {% else %}
+                                <span>No lessons available yet.</span>
+                            {% endif %}
+                        {% endwith %}
+                    {% else %}
+                        <span>No lessons available yet.</span>
+                    {% endif %}
+                {% endwith %}
+            </div>
+
+        {% elif user.is_authenticated %}
+            <p class="outline-cta-text">
+                Ready to start learning?
+            </p>
+            <div class="outline-cta-actions">
+                {# Task 3314 (PR #83) supplies this endpoint as enrollments:enroll_course. #}
+                <form class="outline-enroll-form"
+                      method="post"
+                      action="/enrollments/{{ course.id }}/">
+                    {% csrf_token %}
+                    <button type="submit" class="home-btn home-btn-primary">
+                        Enroll Now
+                    </button>
+                </form>
+            </div>
+
+        {% else %}
+            <p class="outline-cta-text">
+                Create a free account to start learning.
+            </p>
+            <div class="outline-cta-actions">
+                <a class="home-btn home-btn-primary"
+                   href="{% url 'register' %}">
+                    Create a free account
+                </a>
+                <a class="home-btn home-btn-ghost"
+                   href="{% url 'login' %}">
+                    Log in
+                </a>
+            </div>
+        {% endif %}
+
+    </aside>
+</div>
+{% endblock %}
