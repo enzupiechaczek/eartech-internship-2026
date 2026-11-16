@@ -155,7 +155,8 @@ def course_detail(request, pk):
     )
 
     rating_summary = course.reviews.aggregate(
-        average_rating=Avg("rating")
+        average_rating=Avg("rating"),
+        review_count=Count("id"),
     )
 
     reviews = course.reviews.select_related("student").all()
@@ -166,7 +167,7 @@ def course_detail(request, pk):
         {
             "course": course,
             "average_rating": rating_summary["average_rating"],
-            "review_count": reviews.count(),
+            "review_count": rating_summary["review_count"],
             "reviews": reviews,
         },
     )
