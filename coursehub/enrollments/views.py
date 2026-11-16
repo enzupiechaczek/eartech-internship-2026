@@ -1,8 +1,4 @@
-from django.shortcuts import render
-
-# Create your views here.
-
-from django.views.generic import ListView, DetailView
+from django.views.generic import DetailView, ListView
 
 from accounts.decorators import StudentRequiredMixin
 from .models import Enrollment
@@ -27,7 +23,7 @@ class StudentDashboardView(StudentRequiredMixin, ListView):
 
 class StudentCourseDetailView(StudentRequiredMixin, DetailView):
     model = Enrollment
-    template_name = "enrollments/course_ detail.html"
+    template_name = "enrollments/course_detail.html"
     context_object_name = "enrollment"
     pk_url_kwarg = "enrollment_id"
 

@@ -1,30 +1,25 @@
-from django.db import models
 from django.conf import settings
+from django.db import models
 
 
 class Enrollment(models.Model):
     student = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="enrollments"
+        related_name="enrollments",
     )
 
     course = models.ForeignKey(
         "courses.Course",
         on_delete=models.CASCADE,
-        related_name="enrollments"
+        related_name="enrollments",
     )
 
     enrolled_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["student", "course"],
-                name="unique_student_course_enrollment"
-                )
-            ]
-                
+        unique_together = ("student", "course")
+
     def __str__(self):
         return f"{self.student} -> {self.course}"
 
@@ -35,12 +30,15 @@ class Enrollment(models.Model):
         )["total"] or 0
 
     @property
+    def completed_lessons(self):
+        # LessonProgress is added in task 3322; until then nothing is completed.
+        return 0
+
+    @property
     def progress_percentage(self):
         total = self.total_lessons
 
         if not total:
             return 0
 
-        return round(
-            self.completed_lessons / total * 100
-        )                   
+        return round(self.completed_lessons / total * 100)
