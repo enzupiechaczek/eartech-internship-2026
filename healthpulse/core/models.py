@@ -21,8 +21,6 @@ class DoctorProfile(models.Model):
         on_delete=models.CASCADE,
         related_name="doctorprofile",
     )
-        related_name='doctorprofile'
-    )
 
     specialty = models.CharField(max_length=100, blank=True)
     clinic_branch = models.CharField(max_length=150, blank=True)
