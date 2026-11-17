@@ -30,9 +30,8 @@
                                     {% for lsn in mod.lessons.all %}
                                     <li
                                         class="list-group-item {% if lsn == lesson %}active bg-primary text-white{% endif %}">
-                                        <a href="{% url 'courses:lesson_detail' lsn.id %}" ...>
-                                            class="text-decoration-none {% if lsn == lesson %}text-white{% else
-                                            %}text-dark{% endif %}">
+                                        <a href="{% url 'courses:lesson_detail' lsn.id %}"
+                                            class="text-decoration-none {% if lsn == lesson %}text-white{% else %}text-dark{% endif %}">
                                             {{ lsn.title }}
                                         </a>
                                     </li>
