@@ -69,12 +69,15 @@
                         / {{ enrollment.total_lessons }}
                         lessons completed
                     </p>
-
                     <a
                         href="{% url 'enrollments:course_detail' enrollment.pk %}"
                         class="btn btn-primary w-100"
                     >
-                        Start Course
+                        {% if enrollment.progress_percentage > 0 %}
+                            Continue
+                        {% else %}
+                            Start Course
+                        {% endif %}
                     </a>
 
                 </div>
