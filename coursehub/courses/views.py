@@ -54,6 +54,7 @@ class CourseUpdateView(InstructorRequiredMixin, CourseFormMixin, UpdateView):
 
 
 def course_list(request):
+    q = request.GET.get('q', '').strip()
     return HttpResponse('Courses app is working ✅')
 
 
