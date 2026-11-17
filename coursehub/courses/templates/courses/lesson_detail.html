@@ -93,17 +93,17 @@
 </div>
 
 <script>
-    const csrftoken = document.cookie.split("; ").find(c => c.startswith("csrftoken="))?.split("=")[1];
+    const csrftoken = document.cookie.split("; ").find(c => c.startsWith("csrftoken="))?.split("=")[1];
     
     //set initial progress on page load
-    const initialPercent = {{ completion_percent|default:0 }};
+    const initialPercent = Number("{{ completion_percent|default:0 }}");
     document.getElementById("progress-bar").style.width = initialPercent + "%";
-    document.getElementById("progress-bar").testContent = initialPercent + "%";
+    document.getElementById("progress-bar").textContent = initialPercent + "%";
     document.getElementById("progress-bar").setAttribute("aria-valuenow", initialPercent);
     document.getElementById("progress-percent").textContent = initialPercent + "%";
 
     document.getElementById("complete-btn").addEventListener("click", async (e) => {
-        const btn = e.target;
+        const btn = e.currentTarget;
         const res = await fetch(btn.dataset.url, {
             method:"POST",
             headers: { "X-CSRFToken": csrftoken }
@@ -127,6 +127,6 @@
         btn.disabled = true;
         btn.textContent = "Completed ✓";
     });
-    </script>
+</script>
 
 {% endblock %}
