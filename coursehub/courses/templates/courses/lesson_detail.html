@@ -19,10 +19,30 @@
         </ol>
     </nav>
 
+    <div class="mb-3">
+        <div class="d-flex justify-content-between mb-1">
+            <span>Course Progress</span>
+            <span id="progress-percent">{{ completion_percent|default:0 }}%</span>
+        </div>
+        <div class="progress" style="height: 25px;">
+            <div id="progress-bar"
+                class="progress-bar"
+                role="progressbar"
+                style="width: 0%"
+                aria-valuenow="0"
+                aria-valuemin="0"
+                aria-valuemax="100">
+                0%
+            </div>
+        </div>
+    </div>
+
+
+
     <div class="card shadow-sm">
         <div class="card-body p-4">
 
-            <h2 class="mb-3">{{ lesson.title }}</h2>
+            <h2 class="mb-3" id="lesson-{{ lesson.pk }}">{{ lesson.title }}</h2>
 
             <hr>
 
@@ -55,6 +75,13 @@
 
             <hr>
 
+            <button id="complete-btn"
+                    data-url="{% url 'courses:complete_lesson' lesson.pk %}"
+                    data-id="{{ lesson.pk }}"
+                    class="btn btn-success">
+                    Mark as Complete
+            </button>
+
             <a href="{% url 'courses:outline' course.id %}"
                class="btn btn-outline-secondary">
                 Back to Course Outline
@@ -64,5 +91,42 @@
     </div>
 
 </div>
+
+<script>
+    const csrftoken = document.cookie.split("; ").find(c => c.startswith("csrftoken="))?.split("=")[1];
+    
+    //set initial progress on page load
+    const initialPercent = {{ completion_percent|default:0 }};
+    document.getElementById("progress-bar").style.width = initialPercent + "%";
+    document.getElementById("progress-bar").testContent = initialPercent + "%";
+    document.getElementById("progress-bar").setAttribute("aria-valuenow", initialPercent);
+    document.getElementById("progress-percent").textContent = initialPercent + "%";
+
+    document.getElementById("complete-btn").addEventListener("click", async (e) => {
+        const btn = e.target;
+        const res = await fetch(btn.dataset.url, {
+            method:"POST",
+            headers: { "X-CSRFToken": csrftoken }
+        });
+        if (!res.ok) {
+            alert("could not save progress");
+            return;
+        }
+        const data = await res.json();
+
+        const lessonTitle = document.querySelector("#lesson-" + data.lesson);
+        lessonTitle.textContent = "✅ " + lessonTitle.textContent;
+
+        const bar = document.querySelector("#progress-bar");
+        const percentText = document.querySelector("#progress-percent");
+        bar.style.width = data.percent + "%";
+        bar.textContent = data.percent + "%";
+        bar.setAttribute("aria-valuenow", data.percent);
+        percentText.textContent = data.percent + "%";
+
+        btn.disabled = true;
+        btn.textContent = "Completed ✓";
+    });
+    </script>
 
 {% endblock %}

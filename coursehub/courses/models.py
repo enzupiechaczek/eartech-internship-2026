@@ -109,6 +109,18 @@ class Course(models.Model):
     def __str__(self):
         return self.title
 
+    def get_completion_percentage(self, student):
+        """calculate completion percentage for a given student."""
+        from django.db.models import Count
+
+        total_lessons = Lesson.objects.filter(module__course=self).count()
+        if total_lessons == 0:
+            return 0
+
+        completed_lessons = LessonProgress.objects.filter(student=student, lesson__module__course=self).count()
+
+        return round((completed_lessons / total_lessons) * 100)
+
 
 class Module(models.Model):
     course = models.ForeignKey('Course', on_delete=models.CASCADE, related_name='modules')
@@ -138,3 +150,15 @@ class Lesson(models.Model):
 
     def __str__(self):
         return f"{self.module.title} - {self.title}"
+
+
+class LessonProgress(models.Model):
+    student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='lesson_progress')
+    lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name="progress")
+    completed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('student', 'lesson')
+
+    def __str__(self):
+        return f"{self.student} completed {self.lesson}"
