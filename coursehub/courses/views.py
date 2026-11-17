@@ -61,11 +61,15 @@ def course_list(request):
 def course_outline(request, pk):
     """Public, read-only curriculum outline for a published course."""
     course = get_object_or_404(
-        Course.objects.select_related("instructor", "category"),
+        Course.objects.select_related("instructor", "category").annotate(
+            average_rating=Avg("reviews__rating"),
+            review_count=Count("reviews"),
+        ),
         pk=pk,
         status=Course.Status.PUBLISHED,
     )
     modules = course.modules.prefetch_related("lessons").all()
+    reviews = course.reviews.select_related("student").all()
 
     is_instructor = (
         request.user.is_authenticated
@@ -91,6 +95,9 @@ def course_outline(request, pk):
             ),
             "is_instructor": is_instructor,
             "is_enrolled": is_enrolled,
+            "average_rating": course.average_rating,
+            "review_count": course.review_count,
+            "reviews": reviews,
         },
     )
 
@@ -145,32 +152,6 @@ def home(request):
 
 def about(request):
     return render(request, "about.html")
-
-
-def course_detail(request, pk):
-    course = get_object_or_404(
-        Course.objects.select_related("instructor", "category"),
-        pk=pk,
-        status=Course.Status.PUBLISHED,
-    )
-
-    rating_summary = course.reviews.aggregate(
-        average_rating=Avg("rating"),
-        review_count=Count("id"),
-    )
-
-    reviews = course.reviews.select_related("student").all()
-
-    return render(
-        request,
-        "courses/course_detail.html",
-        {
-            "course": course,
-            "average_rating": rating_summary["average_rating"],
-            "review_count": rating_summary["review_count"],
-            "reviews": reviews,
-        },
-    )
 
 
 @instructor_required

@@ -6,7 +6,7 @@ app_name = 'courses'
 urlpatterns = [
     path('', views.course_list, name='list'),
 
-    # Public curriculum outline
+    # Public curriculum outline with ratings and reviews
     path('<int:pk>/outline/', views.course_outline, name='outline'),
 
     # Protected lesson content
@@ -20,7 +20,6 @@ urlpatterns = [
     path('new/', views.CourseCreateView.as_view(), name='course_create'),
     path('<int:pk>/edit/', views.CourseUpdateView.as_view(), name='course_update'),
     path('<int:pk>/toggle-publish/', views.toggle_publish, name='toggle_publish'),
-    path('<int:pk>/', views.course_detail, name='detail'),
 
     # Curriculum
     path(

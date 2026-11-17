@@ -31,7 +31,7 @@ class CourseRatingDisplayTests(TestCase):
             status=Course.Status.PUBLISHED,
         )
 
-    def test_course_detail_displays_average_rating_and_reviews(self):
+    def test_course_outline_displays_average_rating_and_reviews(self):
         Review.objects.create(
             course=self.course,
             student=self.student_one,
@@ -46,7 +46,7 @@ class CourseRatingDisplayTests(TestCase):
         )
 
         response = self.client.get(
-            reverse("courses:detail", args=[self.course.pk])
+            reverse("courses:outline", args=[self.course.pk])
         )
 
         self.assertEqual(response.status_code, 200)
@@ -81,14 +81,14 @@ class CourseRatingDisplayTests(TestCase):
         self.assertContains(response, "(2 reviews)")
 
     def test_course_pages_display_message_when_there_are_no_reviews(self):
-        detail_response = self.client.get(
-            reverse("courses:detail", args=[self.course.pk])
+        outline_response = self.client.get(
+            reverse("courses:outline", args=[self.course.pk])
         )
         home_response = self.client.get(reverse("home"))
 
-        self.assertEqual(detail_response.status_code, 200)
+        self.assertEqual(outline_response.status_code, 200)
         self.assertEqual(home_response.status_code, 200)
-        self.assertContains(detail_response, "No reviews yet")
+        self.assertContains(outline_response, "No reviews yet")
         self.assertContains(home_response, "No reviews yet")
 
     def test_homepage_displays_singular_review_label(self):
@@ -105,7 +105,7 @@ class CourseRatingDisplayTests(TestCase):
         self.assertContains(response, "(1 review)")
         self.assertNotContains(response, "(1 reviews)")
 
-    def test_draft_course_detail_returns_404(self):
+    def test_draft_course_outline_returns_404(self):
         draft_course = Course.objects.create(
             title="Draft Django Course",
             instructor=self.instructor,
@@ -114,7 +114,7 @@ class CourseRatingDisplayTests(TestCase):
         )
 
         response = self.client.get(
-            reverse("courses:detail", args=[draft_course.pk])
+            reverse("courses:outline", args=[draft_course.pk])
         )
 
         self.assertEqual(response.status_code, 404)
