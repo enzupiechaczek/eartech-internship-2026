@@ -2,7 +2,8 @@ from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
-from django.http import HttpResponse
+from django.core.paginator import Paginator
+from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.views.decorators.http import require_POST
@@ -12,7 +13,9 @@ from accounts.decorators import InstructorRequiredMixin, instructor_required
 from enrollments.models import Enrollment
 
 from .forms import CourseForm, LessonForm, ModuleForm
-from .models import Course, Lesson, Module
+from .models import Category, Course, Lesson, Module
+
+COURSES_PER_PAGE = 9
 
 
 class CourseFormMixin:
@@ -54,7 +57,44 @@ class CourseUpdateView(InstructorRequiredMixin, CourseFormMixin, UpdateView):
 
 
 def course_list(request):
-    return HttpResponse('Courses app is working ✅')
+    """Public catalogue of published courses, with search and category filters."""
+    q = request.GET.get("q", "").strip()
+    category_id = request.GET.get("category", "").strip()
+
+    courses = (
+        Course.objects.filter(status=Course.Status.PUBLISHED)
+        .select_related("instructor", "category")
+        .order_by("-created_at", "-pk")
+    )
+
+    if q:
+        courses = courses.filter(
+            Q(title__icontains=q)
+            | Q(subtitle__icontains=q)
+            | Q(description__icontains=q)
+        )
+
+    selected_category = None
+    if category_id.isdigit():
+        selected_category = Category.objects.filter(pk=int(category_id)).first()
+        if selected_category is not None:
+            courses = courses.filter(category=selected_category)
+
+    page_obj = Paginator(courses, COURSES_PER_PAGE).get_page(
+        request.GET.get("page")
+    )
+
+    return render(
+        request,
+        "courses/course_list.html",
+        {
+            "courses": page_obj.object_list,
+            "page_obj": page_obj,
+            "q": q,
+            "categories": Category.objects.order_by("name"),
+            "selected_category": selected_category,
+        },
+    )
 
 
 def course_outline(request, pk):
