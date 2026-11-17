@@ -16,7 +16,7 @@ from PIL import Image
 from enrollments.models import Enrollment
 
 from .forms import CourseForm, MAX_THUMBNAIL_SIZE, validate_thumbnail_size
-from .models import Category, Course, Module, Lesson, embed_url
+from .models import Category, Course, Module, Lesson, embed_url, LessonProgress
 
 TEMP_MEDIA_ROOT = tempfile.mkdtemp()
 
@@ -25,6 +25,49 @@ def make_image(name="thumb.png", fmt="PNG"):
     buffer = io.BytesIO()
     Image.new("RGB", (10, 10), "blue").save(buffer, fmt)
     return SimpleUploadedFile(name, buffer.getvalue(), content_type=f"image/{fmt.lower()}")
+
+
+class LessonProgressTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.user = User.objects.create_user(username='student', password='pass')
+        self.instructor = User.objects.create_user(username='instructor', password='pass')
+
+        self.course = Course.objects.create(
+            title='Test Course',
+            description='Test Description',
+            instructor=self.instructor,
+            status=Course.Status.PUBLISHED
+        )
+
+        self.module = Module.objects.create(course=self.course, title='Module 1')
+        self.lesson1 = Lesson.objects.create(module=self.module, title='Lesson 1')
+        self.lesson2 = Lesson.objects.create(module=self.module, title='Lesson 2')
+
+        Enrollment.objects.create(student=self.user, course=self.course)
+
+    def test_completion_percentage_zero(self):
+        percent = self.course.get_completion_percentage(self.user)
+        self.assertEqual(percent, 0)
+
+    def test_completion_percentage_half(self):
+        LessonProgress.objects.create(student=self.user, lesson=self.lesson1)
+        percent = self.course.get_completion_percentage(self.user)
+        self.assertEqual(percent, 50)
+
+    def test_completion_percentage_full(self):
+        LessonProgress.objects.create(student=self.user, lesson=self.lesson1)
+        LessonProgress.objects.create(student=self.user, lesson=self.lesson2)
+        percent = self.course.get_completion_percentage(self.user)
+        self.assertEqual(percent, 100)
+
+    def test_complete_lesson_view(self):
+        self.client.login(username='student', password='pass')
+        response = self.client.post(reverse('courses:complete_lesson', args=[self.lesson1.pk]))
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['lesson'], self.lesson1.pk)
+        self.assertEqual(data['percent'], 50)
 
 
 class LessonEmbedUrlTests(TestCase):
