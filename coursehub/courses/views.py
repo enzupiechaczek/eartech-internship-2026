@@ -71,10 +71,9 @@ class StudioView(InstructorRequiredMixin, ListView):
     context_object_name = "courses"
 
     def get_queryset(self):
-        return (
-    Course.objects.filter(instructor=self.request.user)
-    .select_related("category")
-    .order_by("-created_at")
+        return (Course.objects.filter(instructor=self.request.user)
+        .select_related("category")
+        .order_by("-created_at")
         )
 
 
