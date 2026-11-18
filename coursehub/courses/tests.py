@@ -29,9 +29,9 @@ def make_image(name="thumb.png", fmt="PNG"):
 
 class LessonProgressTests(TestCase):
     def setUp(self):
-        User = get_user_model()
-        self.user = User.objects.create_user(username='student', password='pass')
-        self.instructor = User.objects.create_user(username='instructor', password='pass')
+        self.User = get_user_model()
+        self.user = self.User.objects.create_user(username='student', password='pass')
+        self.instructor = self.User.objects.create_user(username='instructor', password='pass')
 
         self.course = Course.objects.create(
             title='Test Course',
@@ -70,7 +70,7 @@ class LessonProgressTests(TestCase):
         self.assertEqual(data['percent'], 50)
 
     def test_enrolled_user_gets_403(self):
-        other_user = User.objects.create_user(username="other", password="pass")
+        other_user = self.User.objects.create_user(username="other", password="pass")
         self.client.login(username="other", password="pass")
         response = self.client.post(reverse('courses:complete_lesson', args=[self.lesson1.pk]))
         self.assertEqual(response.status_code, 403)
