@@ -69,6 +69,57 @@ class LessonProgressTests(TestCase):
         self.assertEqual(data['lesson'], self.lesson1.pk)
         self.assertEqual(data['percent'], 50)
 
+    def test_enrolled_user_gets_403(self):
+        other_user = User.objects.create_user(username="other", password="pass")
+        self.client.login(username="other", password="pass")
+        response = self.client.post(reverse('courses:complete_lesson', args=[self.lesson1.pk]))
+        self.assertEqual(response.status_code, 403)
+
+    def test_anonymous_user_redirected(self):
+        response = self.client.post(reverse('courses:complete_lesson', args=[self.lesson1.pk]))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/login/", response.url)
+
+    def test_get_request_returns_405(self):
+        self.client.login(username="student", password="pass")
+        response = self.client.get(reverse('courses:complete_lesson', args=[self.lesson1.pk]))
+        self.assertEqual(response.status_code, 405)
+
+    def test_double_click_creates_single_record(self):
+        self.client.login(username="student", password="pass")
+
+        # first click
+        response1 = self.client.post(reverse('courses:complete_lesson', args=[self.lesson1.pk]))
+        self.assertEqual(response1.status_code, 200)
+        percent1 = response1.json()["percent"]
+
+        # second click
+        response2 = self.client.post(reverse('courses:complete_lesson', args=[self.lesson1.pk]))
+        self.assertEqual(response2.status_code, 200)
+        percent2 = response2.json()["percent"]
+
+        # should only have one progress record
+        self.assertEqual(LessonProgress.objects.filter(student=self.user, lesson=self.lesson1).count(), 1)
+        # percentage should be the same
+        self.assertEqual(percent1, percent2)
+
+    def test_enrolled_student_cannot_complete_unpublished_course(self):
+        draft_course = Course.objects.create(
+            title='Draft Course',
+            description='Draft',
+            instructor=self.instructor,
+            status=Course.Status.DRAFT
+        )
+
+        draft_module = Module.objects.create(course=draft_course, title='Draft Module')
+        draft_lesson = Lesson.objects.create(module=draft_module, title='Draft Lesson')
+        
+        Enrollment.objects.create(student=self.user, course=draft_course)
+
+        self.client.login(username='student', password='pass')
+        response = self.client.post(reverse('courses:complete_lesson', args=[draft_lesson.pk]))
+        self.assertEqual(response.status_code, 403)
+
 
 class LessonEmbedUrlTests(TestCase):
     def test_youtube_watch_url(self):

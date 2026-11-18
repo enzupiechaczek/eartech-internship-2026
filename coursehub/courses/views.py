@@ -113,7 +113,7 @@ def lesson_view(request, lesson_id):
         and Enrollment.objects.filter(
             student=request.user,
             course=course,
-        ).exists()
+        ).exists() 
     )
 
     if not is_instructor and not is_enrolled:
@@ -124,10 +124,18 @@ def lesson_view(request, lesson_id):
 
     completion_percent = course.get_completion_percentage(request.user)
 
+    is_lesson_completed = LessonProgress.objects.filter(student=request.user, lesson=lesson).exists()
+
     return render(
         request,
         "courses/lesson_detail.html",
-        {"lesson": lesson, "course": course, "completion_percent": completion_percent},
+        {"lesson": lesson, 
+         "course": course, 
+         "completion_percent": completion_percent,
+         "is_lesson_completed": is_lesson_completed,
+         "is_enrolled": is_enrolled,
+         "is_instructor": is_instructor,
+         },
     )
 
 
@@ -341,6 +349,9 @@ def complete_lesson(request, lesson_id):
 
     if not is_enrolled:
         return JsonResponse({'error': 'Not enrolled'}, status=403)
+
+    if course.status != Course.Status.PUBLISHED:
+        return JsonResponse({'error': 'Course is not published'}, status=403)
 
     progress, created = LessonProgress.objects.get_or_create(student=request.user, lesson=lesson)
 

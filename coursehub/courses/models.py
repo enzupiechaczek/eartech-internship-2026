@@ -111,8 +111,6 @@ class Course(models.Model):
 
     def get_completion_percentage(self, student):
         """calculate completion percentage for a given student."""
-        from django.db.models import Count
-
         total_lessons = Lesson.objects.filter(module__course=self).count()
         if total_lessons == 0:
             return 0
