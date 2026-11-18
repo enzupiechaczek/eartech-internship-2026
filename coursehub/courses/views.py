@@ -113,7 +113,7 @@ def lesson_view(request, lesson_id):
         and Enrollment.objects.filter(
             student=request.user,
             course=course,
-        ).exists() 
+        ).exists()
     )
 
     if not is_instructor and not is_enrolled:
