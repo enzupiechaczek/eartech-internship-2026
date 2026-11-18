@@ -45,7 +45,31 @@ def home_redirect(request):
 
 @doctor_required
 def doctor_dashboard(request):
-    return render(request, 'doctor_dashboard.html')
+    appointments = (
+        Appointment.objects.filter(
+            doctor=request.user.doctorprofile,
+            status__in=[
+                Appointment.Status.APPROVED,
+                Appointment.Status.IN_VISIT,
+                Appointment.Status.COMPLETED,
+            ],
+        )
+        .select_related("patient__user")
+        .order_by("appointment_date", "time_slot")
+    )
+
+    for appointment in appointments:
+        appointment.existing_encounter = getattr(
+            appointment,
+            "encounter",
+            None,
+        )
+
+    return render(
+        request,
+        'doctor_dashboard.html',
+        {'appointments': appointments},
+    )
 
 
 @patient_required
