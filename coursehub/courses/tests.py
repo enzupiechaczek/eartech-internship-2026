@@ -1,20 +1,30 @@
 import io
 import os
+import shutil
+import tempfile
 from decimal import Decimal
 from urllib.parse import parse_qs, urlparse
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from PIL import Image
 
 
 from enrollments.models import Enrollment
 
-from .forms import MAX_THUMBNAIL_SIZE, validate_thumbnail_size
+from .forms import CourseForm, MAX_THUMBNAIL_SIZE, validate_thumbnail_size
 from .models import Category, Course, Module, Lesson, embed_url
+
+TEMP_MEDIA_ROOT = tempfile.mkdtemp()
+
+def make_image(name="thumb.png", fmt="PNG"):
+    """A real (tiny) image in memory, so Pillow accepts it."""
+    buffer = io.BytesIO()
+    Image.new("RGB", (10, 10), "blue").save(buffer, fmt)
+    return SimpleUploadedFile(name, buffer.getvalue(), content_type=f"image/{fmt.lower()}")
 
 
 class LessonEmbedUrlTests(TestCase):
@@ -61,7 +71,9 @@ class LessonEmbedUrlTests(TestCase):
         )
 
         self.client.login(username="owner", password="testpass123")
-        response = self.client.get(reverse("courses:curriculum", args=[course.id]))
+        response = self.client.get(
+            reverse("courses:curriculum", args=[course.id])
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "https://www.youtube.com/embed/dQw4w9WgXcQ")
@@ -89,7 +101,9 @@ class LessonEmbedUrlTests(TestCase):
         )
 
         self.client.login(username="owner2", password="testpass123")
-        response = self.client.get(reverse("courses:curriculum", args=[course.id]))
+        response = self.client.get(
+            reverse("courses:curriculum", args=[course.id])
+        )
 
         self.assertContains(response, "Video link is not valid")
 
@@ -166,6 +180,7 @@ class HomeViewTests(TestCase):
     def test_empty_state(self):
         response = self.client.get(reverse("home"))
         self.assertContains(response, "No courses yet.")
+
 
 
 class CourseCurriculumTests(TestCase):
@@ -663,7 +678,7 @@ class CourseCreateUpdateTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Image must be under 2 MB.")
+        self.assertContains(response, "Thumbnail must be 2MB or smaller.")
         self.assertFalse(
             Course.objects.filter(title="Django for Beginners").exists()
         )
@@ -815,6 +830,23 @@ class ThumbnailSizeValidationTests(TestCase):
             content_type="image/jpeg",
         )
         self.assertIs(validate_thumbnail_size(image), image)
+
+    def test_accepts_image_of_exactly_2_mb(self):
+        image = SimpleUploadedFile(
+            "edge.jpg",
+            b"x" * MAX_THUMBNAIL_SIZE,
+            content_type="image/jpeg",
+        )
+        self.assertIs(validate_thumbnail_size(image), image)
+
+    def test_accepts_no_image(self):
+        self.assertIsNone(validate_thumbnail_size(None))
+
+    def test_skips_already_stored_file(self):
+        # A stored file whose image is missing from disk. Reading .size would
+        # raise FileNotFoundError, so the validator must not check it.
+        stored = Course(thumbnail="course_thumbnails/missing.png").thumbnail
+        self.assertIs(validate_thumbnail_size(stored), stored)
 
 
 class TogglePublishTests(TestCase):
@@ -1223,3 +1255,334 @@ class LessonAccessTests(TestCase):
         response = self.client.get(self.url)
 
         self.assertEqual(response.status_code, 403)
+
+class CourseFormThumbnailTests(TestCase):
+    """Step 3: extension, real-image and size checks on the form itself."""
+
+    def form_with(self, thumbnail=None, instance=None):
+        files = {"thumbnail": thumbnail} if thumbnail else {}
+        form = CourseForm(data={"title": "Python Basics"}, files=files, instance=instance)
+        form.is_valid()
+        return form
+
+    # ----- allowed formats -------------------------------------------------
+
+    def test_png_accepted(self):
+        form = self.form_with(make_image("thumb.png", "PNG"))
+        self.assertNotIn("thumbnail", form.errors)
+
+    def test_jpg_accepted(self):
+        form = self.form_with(make_image("thumb.jpg", "JPEG"))
+        self.assertNotIn("thumbnail", form.errors)
+
+    def test_jpeg_extension_accepted(self):
+        form = self.form_with(make_image("thumb.jpeg", "JPEG"))
+        self.assertNotIn("thumbnail", form.errors)
+
+    def test_webp_extension_accepted(self):
+        form = self.form_with(make_image("thumb.webp", "WEBP"))
+        self.assertNotIn("thumbnail", form.errors)
+
+    def test_uppercase_extension_accepted(self):
+        form = self.form_with(make_image("PHOTO.JPG", "JPEG"))
+        self.assertNotIn("thumbnail", form.errors)
+
+    # ----- rejected formats ------------------------------------------------
+
+    def test_gif_rejected_even_though_it_is_a_real_image(self):
+        form = self.form_with(make_image("thumb.gif", "GIF"))
+        self.assertIn("thumbnail", form.errors)
+
+    def test_bmp_rejected(self):
+        form = self.form_with(make_image("thumb.bmp", "BMP"))
+        self.assertIn("thumbnail", form.errors)
+
+    def test_text_file_rejected(self):
+        bad = SimpleUploadedFile("notes.txt", b"hello", content_type="text/plain")
+        form = self.form_with(bad)
+        self.assertIn("thumbnail", form.errors)
+
+    def test_fake_image_with_jpg_extension_rejected(self):
+        fake = SimpleUploadedFile("evil.jpg", b"not really an image", content_type="image/jpeg")
+        form = self.form_with(fake)
+        self.assertIn("thumbnail", form.errors)
+
+    # ----- size ------------------------------------------------------------
+
+    def test_size_error_shown_on_form(self):
+        big = make_image()
+        big.size = MAX_THUMBNAIL_SIZE + 1   # pretend it's just over the limit
+        form = self.form_with(big)
+        self.assertIn("2MB", " ".join(form.errors["thumbnail"]))
+
+    def test_exactly_2_mb_accepted_on_form(self):
+        edge = make_image()
+        edge.size = MAX_THUMBNAIL_SIZE
+        form = self.form_with(edge)
+        self.assertNotIn("thumbnail", form.errors)
+
+    # ----- optional / editing ---------------------------------------------
+
+    def test_thumbnail_is_optional(self):
+        form = self.form_with()
+        self.assertNotIn("thumbnail", form.errors)
+
+    def test_edit_without_new_file_does_not_read_stored_file(self):
+        course = Course(title="Old course", thumbnail="course_thumbnails/missing.png")
+        form = self.form_with(thumbnail=None, instance=course)
+        self.assertNotIn("thumbnail", form.errors)
+
+
+@override_settings(MEDIA_ROOT=TEMP_MEDIA_ROOT)
+class CourseThumbnailUploadViewTests(TestCase):
+    """Steps 1 and 2: the form page supports uploads and the view receives request.FILES."""
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(TEMP_MEDIA_ROOT, ignore_errors=True)
+        super().tearDownClass()
+
+    def setUp(self):
+        self.instructor = get_user_model().objects.create_user(
+            username="lina", password="pass", role="INSTRUCTOR",
+        )
+        self.category = Category.objects.get(name="Web Development")
+        self.client.login(username="lina", password="pass")
+
+    def payload(self, **overrides):
+        data = {
+            "title": "Django for Beginners",
+            "subtitle": "Build your first web app",
+            "category": self.category.pk,
+            "price": "49.00",
+            "description": "A beginner friendly Django course.",
+            "thumbnail": "",
+        }
+        data.update(overrides)
+        return data
+
+    def make_course(self, **extra):
+        return Course.objects.create(
+            title="My course",
+            instructor=self.instructor,
+            description="Mine.",
+            category=self.category,
+            **extra,
+        )
+
+    # ----- step 1: enctype -------------------------------------------------
+
+    def test_create_form_supports_file_upload(self):
+        response = self.client.get(reverse("courses:course_create"))
+        self.assertContains(response, 'enctype="multipart/form-data"')
+
+    def test_update_form_supports_file_upload(self):
+        course = self.make_course()
+        response = self.client.get(reverse("courses:course_update", args=[course.pk]))
+        self.assertContains(response, 'enctype="multipart/form-data"')
+
+    def test_file_input_only_offers_allowed_types(self):
+        response = self.client.get(reverse("courses:course_create"))
+        self.assertContains(response, 'Only JPG, JPEG, PNG, and WEBP images are allowed.')
+
+    # ----- step 2: request.FILES reaches the form --------------------------
+
+    def test_create_saves_uploaded_thumbnail(self):
+        response = self.client.post(
+            reverse("courses:course_create"),
+            self.payload(thumbnail=make_image("thumb.png")),
+        )
+        self.assertRedirects(response, reverse("studio"))
+        course = Course.objects.get(title="Django for Beginners")
+        self.assertTrue(course.thumbnail)
+        self.assertTrue(course.thumbnail.name.endswith(".png"))
+
+    def test_create_without_thumbnail_still_works(self):
+        response = self.client.post(reverse("courses:course_create"), self.payload())
+        self.assertRedirects(response, reverse("studio"))
+        course = Course.objects.get(title="Django for Beginners")
+        self.assertFalse(course.thumbnail)
+
+    def test_update_replaces_thumbnail(self):
+        course = self.make_course(thumbnail=make_image("old.png"))
+        self.client.post(
+            reverse("courses:course_update", args=[course.pk]),
+            self.payload(title="My course", thumbnail=make_image("new.png")),
+        )
+        course.refresh_from_db()
+        self.assertIn("new", course.thumbnail.name)
+
+    def test_update_without_new_file_keeps_existing_thumbnail(self):
+        course = self.make_course(thumbnail=make_image("keep.png"))
+        old_name = course.thumbnail.name
+        self.client.post(
+            reverse("courses:course_update", args=[course.pk]),
+            self.payload(title="Renamed course"),
+        )
+        course.refresh_from_db()
+        self.assertEqual(course.title, "Renamed course")
+        self.assertEqual(course.thumbnail.name, old_name)
+
+    def test_update_works_when_stored_thumbnail_file_is_missing(self):
+        # Real-world case: the database points to an image that isn't on disk
+        # (e.g. media/ isn't shared through Git). Editing must not crash.
+        course = self.make_course(thumbnail="course_thumbnails/missing.png")
+        response = self.client.post(
+            reverse("courses:course_update", args=[course.pk]),
+            self.payload(title="Still editable"),
+        )
+        self.assertRedirects(response, reverse("studio"))
+
+    # ----- step 3, end to end ----------------------------------------------
+
+    def test_create_rejects_wrong_extension(self):
+        bad = SimpleUploadedFile("notes.txt", b"hello", content_type="text/plain")
+        response = self.client.post(
+            reverse("courses:course_create"), self.payload(thumbnail=bad)
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("thumbnail", response.context["form"].errors)
+        self.assertFalse(Course.objects.filter(title="Django for Beginners").exists())
+
+    def test_create_rejects_fake_image(self):
+        fake = SimpleUploadedFile("evil.jpg", b"not an image", content_type="image/jpeg")
+        response = self.client.post(
+            reverse("courses:course_create"), self.payload(thumbnail=fake)
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("thumbnail", response.context["form"].errors)
+        self.assertFalse(Course.objects.filter(title="Django for Beginners").exists())
+
+    def test_rejected_upload_does_not_change_existing_thumbnail(self):
+        course = self.make_course(thumbnail=make_image("keep.png"))
+        old_name = course.thumbnail.name
+        bad = SimpleUploadedFile("notes.txt", b"hello", content_type="text/plain")
+        self.client.post(
+            reverse("courses:course_update", args=[course.pk]),
+            self.payload(title="My course", thumbnail=bad),
+        )
+        course.refresh_from_db()
+        self.assertEqual(course.thumbnail.name, old_name)
+
+
+class LessonDetailTemplateTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.instructor = User.objects.create_user(
+            username="classroom_instructor",
+            password="password123",
+            role="INSTRUCTOR",
+        )
+        self.student = User.objects.create_user(
+            username="classroom_student",
+            password="password123",
+            role="STUDENT",
+        )
+        self.course = Course.objects.create(
+            title="Django Masterclass",
+            instructor=self.instructor,
+            status=Course.Status.PUBLISHED,
+        )
+        Enrollment.objects.create(
+            student=self.student,
+            course=self.course,
+        )
+        self.module_1 = Module.objects.create(
+            course=self.course,
+            title="Getting Started",
+            order=1,
+        )
+        self.module_2 = Module.objects.create(
+            course=self.course,
+            title="Advanced Topics",
+            order=2,
+        )
+        self.lesson_1 = Lesson.objects.create(
+            module=self.module_1,
+            title="Installation",
+            notes="Step 1: Install Python\nStep 2: Install Django",
+            video_url="https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            order=1,
+        )
+        self.lesson_2 = Lesson.objects.create(
+            module=self.module_1,
+            title="Configuration",
+            notes="Set up settings.py",
+            video_url="https://example.com/not-a-valid-video",
+            order=2,
+        )
+        self.lesson_3 = Lesson.objects.create(
+            module=self.module_2,
+            title="Deployment",
+            notes="Deploy to production",
+            video_url="",
+            order=1,
+        )
+        self.client.force_login(self.student)
+
+    def test_sidebar_renders_course_title_modules_and_lessons(self):
+        url = reverse("courses:lesson_view", args=[self.lesson_1.id])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Django Masterclass")
+        self.assertContains(response, "Getting Started")
+        self.assertContains(response, "Advanced Topics")
+        self.assertContains(response, "Installation")
+        self.assertContains(response, "Configuration")
+        self.assertContains(response, "Deployment")
+        self.assertContains(response, 'id="courseAccordion"')
+
+    def test_accordion_preserves_bootstrap_and_accessibility_attributes(self):
+        url = reverse("courses:lesson_view", args=[self.lesson_1.id])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-bs-toggle="collapse"')
+        self.assertContains(response, f'data-bs-target="#collapse{self.module_1.id}"')
+        self.assertContains(response, 'data-bs-parent="#courseAccordion"')
+        self.assertContains(response, f'aria-controls="collapse{self.module_1.id}"')
+        self.assertContains(response, f'aria-labelledby="heading{self.module_1.id}"')
+
+    def test_current_lesson_highlighted_and_module_expanded(self):
+        url = reverse("courses:lesson_view", args=[self.lesson_1.id])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "active bg-primary text-white")
+        self.assertContains(response, f'id="collapse{self.module_1.id}"')
+        self.assertContains(response, "collapse show")
+        self.assertContains(response, "accordion-button collapsed")
+
+    def test_valid_video_embed_renders_iframe(self):
+        url = reverse("courses:lesson_view", args=[self.lesson_1.id])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ"')
+        self.assertNotContains(response, "Video link is not valid")
+
+    def test_invalid_video_embed_displays_fallback(self):
+        url = reverse("courses:lesson_view", args=[self.lesson_2.id])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Video link is not valid")
+        self.assertNotContains(response, "<iframe")
+
+    def test_no_video_shows_no_warning(self):
+        url = reverse("courses:lesson_view", args=[self.lesson_3.id])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Video link is not valid")
+        self.assertNotContains(response, "<iframe")
+
+    def test_lesson_notes_rendered_with_linebreaks(self):
+        url = reverse("courses:lesson_view", args=[self.lesson_1.id])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Installation")
+        self.assertContains(response, "Step 1: Install Python<br>Step 2: Install Django")
+
