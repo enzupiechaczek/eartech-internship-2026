@@ -16,7 +16,7 @@ from PIL import Image
 from enrollments.models import Enrollment
 
 from .forms import CourseForm, MAX_THUMBNAIL_SIZE, validate_thumbnail_size
-from .models import Category, Course, Module, Lesson, embed_url
+from .models import Category, Course, Module, Lesson, embed_url, LessonProgress
 
 TEMP_MEDIA_ROOT = tempfile.mkdtemp()
 
@@ -25,6 +25,142 @@ def make_image(name="thumb.png", fmt="PNG"):
     buffer = io.BytesIO()
     Image.new("RGB", (10, 10), "blue").save(buffer, fmt)
     return SimpleUploadedFile(name, buffer.getvalue(), content_type=f"image/{fmt.lower()}")
+
+
+class LessonProgressTests(TestCase):
+    def setUp(self):
+        self.User = get_user_model()
+        self.user = self.User.objects.create_user(username='student', password='pass')
+        self.instructor = self.User.objects.create_user(username='instructor', password='pass')
+
+        self.course = Course.objects.create(
+            title='Test Course',
+            description='Test Description',
+            instructor=self.instructor,
+            status=Course.Status.PUBLISHED
+        )
+
+        self.module = Module.objects.create(course=self.course, title='Module 1')
+        self.lesson1 = Lesson.objects.create(module=self.module, title='Lesson 1')
+        self.lesson2 = Lesson.objects.create(module=self.module, title='Lesson 2')
+
+        Enrollment.objects.create(student=self.user, course=self.course)
+
+    def test_completion_percentage_zero(self):
+        percent = self.course.get_completion_percentage(self.user)
+        self.assertEqual(percent, 0)
+
+    def test_completion_percentage_half(self):
+        LessonProgress.objects.create(student=self.user, lesson=self.lesson1)
+        percent = self.course.get_completion_percentage(self.user)
+        self.assertEqual(percent, 50)
+
+    def test_completion_percentage_full(self):
+        LessonProgress.objects.create(student=self.user, lesson=self.lesson1)
+        LessonProgress.objects.create(student=self.user, lesson=self.lesson2)
+        percent = self.course.get_completion_percentage(self.user)
+        self.assertEqual(percent, 100)
+
+    def test_complete_lesson_view(self):
+        self.client.login(username='student', password='pass')
+        response = self.client.post(reverse('courses:complete_lesson', args=[self.lesson1.pk]))
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['lesson'], self.lesson1.pk)
+        self.assertEqual(data['percent'], 50)
+
+    def test_non_enrolled_user_gets_403(self):
+        other_user = self.User.objects.create_user(username="other", password="pass")
+        self.client.login(username="other", password="pass")
+        response = self.client.post(reverse('courses:complete_lesson', args=[self.lesson1.pk]))
+        self.assertEqual(response.status_code, 403)
+
+    def test_anonymous_user_redirected(self):
+        response = self.client.post(reverse('courses:complete_lesson', args=[self.lesson1.pk]))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/login/", response.url)
+
+    def test_get_request_returns_405(self):
+        self.client.login(username="student", password="pass")
+        response = self.client.get(reverse('courses:complete_lesson', args=[self.lesson1.pk]))
+        self.assertEqual(response.status_code, 405)
+
+    def test_double_click_creates_single_record(self):
+        self.client.login(username="student", password="pass")
+
+        # first click
+        response1 = self.client.post(reverse('courses:complete_lesson', args=[self.lesson1.pk]))
+        self.assertEqual(response1.status_code, 200)
+        percent1 = response1.json()["percent"]
+
+        # second click
+        response2 = self.client.post(reverse('courses:complete_lesson', args=[self.lesson1.pk]))
+        self.assertEqual(response2.status_code, 200)
+        percent2 = response2.json()["percent"]
+
+        # should only have one progress record
+        self.assertEqual(LessonProgress.objects.filter(student=self.user, lesson=self.lesson1).count(), 1)
+        # percentage should be the same
+        self.assertEqual(percent1, percent2)
+
+    def test_enrolled_student_cannot_complete_unpublished_course(self):
+        draft_course = Course.objects.create(
+            title='Draft Course',
+            description='Draft',
+            instructor=self.instructor,
+            status=Course.Status.DRAFT
+        )
+
+        draft_module = Module.objects.create(course=draft_course, title='Draft Module')
+        draft_lesson = Lesson.objects.create(module=draft_module, title='Draft Lesson')
+        
+        Enrollment.objects.create(student=self.user, course=draft_course)
+
+        self.client.login(username='student', password='pass')
+        response = self.client.post(reverse('courses:complete_lesson', args=[draft_lesson.pk]))
+        self.assertEqual(response.status_code, 403)
+
+    def test_enrolled_student_sees_progress_bar_and_button(self):
+        self.client.login(username='student', password='pass')
+        response = self.client.get(reverse('courses:lesson_view', args=[self.lesson1.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'progress-bar')
+        self.assertContains(response, 'complete-btn')
+        self.assertContains(response, 'Mark as Complete')
+    
+    def test_instructor_does_not_see_progress_controls(self):
+        self.client.login(username='instructor', password='pass')
+        response = self.client.get(reverse('courses:lesson_view', args=[self.lesson1.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'progress-bar')
+        self.assertNotContains(response, 'complete-btn')
+
+    def test_complete_lesson_shows_completed_state(self):
+        LessonProgress.objects.create(student=self.user, lesson=self.lesson1)
+
+        self.client.login(username='student', password='pass')
+        response = self.client.get(reverse('courses:lesson_view', args=[self.lesson1.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Completed')
+        self.assertContains(response, 'disabled')
+
+    def test_instructor_cannot_complete_lesson(self):
+        self.client.login(username='instructor', password='pass')
+        response = self.client.post(reverse('courses:complete_lesson', args=[self.lesson1.pk]))
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(LessonProgress.objects.filter(student=self.instructor, lesson=self.lesson1).exists())
+
+    def test_completion_percentage_isolated_per_student(self):
+        other_student = self.User.objects.create_user(username="other_student", password="pass")
+        Enrollment.objects.create(student=other_student, course=self.course)
+
+        LessonProgress.objects.create(student=self.user, lesson=self.lesson1)
+
+        percent1 = self.course.get_completion_percentage(self.user)
+        self.assertEqual(percent1, 50)
+
+        percent2 = self.course.get_completion_percentage(other_student)
+        self.assertEqual(percent2, 0)
 
 
 class LessonEmbedUrlTests(TestCase):
@@ -1585,4 +1721,3 @@ class LessonDetailTemplateTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Installation")
         self.assertContains(response, "Step 1: Install Python<br>Step 2: Install Django")
-
