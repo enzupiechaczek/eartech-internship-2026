@@ -1463,3 +1463,126 @@ class CourseThumbnailUploadViewTests(TestCase):
         )
         course.refresh_from_db()
         self.assertEqual(course.thumbnail.name, old_name)
+
+
+class LessonDetailTemplateTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.instructor = User.objects.create_user(
+            username="classroom_instructor",
+            password="password123",
+            role="INSTRUCTOR",
+        )
+        self.student = User.objects.create_user(
+            username="classroom_student",
+            password="password123",
+            role="STUDENT",
+        )
+        self.course = Course.objects.create(
+            title="Django Masterclass",
+            instructor=self.instructor,
+            status=Course.Status.PUBLISHED,
+        )
+        Enrollment.objects.create(
+            student=self.student,
+            course=self.course,
+        )
+        self.module_1 = Module.objects.create(
+            course=self.course,
+            title="Getting Started",
+            order=1,
+        )
+        self.module_2 = Module.objects.create(
+            course=self.course,
+            title="Advanced Topics",
+            order=2,
+        )
+        self.lesson_1 = Lesson.objects.create(
+            module=self.module_1,
+            title="Installation",
+            notes="Step 1: Install Python\nStep 2: Install Django",
+            video_url="https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            order=1,
+        )
+        self.lesson_2 = Lesson.objects.create(
+            module=self.module_1,
+            title="Configuration",
+            notes="Set up settings.py",
+            video_url="https://example.com/not-a-valid-video",
+            order=2,
+        )
+        self.lesson_3 = Lesson.objects.create(
+            module=self.module_2,
+            title="Deployment",
+            notes="Deploy to production",
+            video_url="",
+            order=1,
+        )
+        self.client.force_login(self.student)
+
+    def test_sidebar_renders_course_title_modules_and_lessons(self):
+        url = reverse("courses:lesson_view", args=[self.lesson_1.id])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Django Masterclass")
+        self.assertContains(response, "Getting Started")
+        self.assertContains(response, "Advanced Topics")
+        self.assertContains(response, "Installation")
+        self.assertContains(response, "Configuration")
+        self.assertContains(response, "Deployment")
+        self.assertContains(response, 'id="courseAccordion"')
+
+    def test_accordion_preserves_bootstrap_and_accessibility_attributes(self):
+        url = reverse("courses:lesson_view", args=[self.lesson_1.id])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-bs-toggle="collapse"')
+        self.assertContains(response, f'data-bs-target="#collapse{self.module_1.id}"')
+        self.assertContains(response, 'data-bs-parent="#courseAccordion"')
+        self.assertContains(response, f'aria-controls="collapse{self.module_1.id}"')
+        self.assertContains(response, f'aria-labelledby="heading{self.module_1.id}"')
+
+    def test_current_lesson_highlighted_and_module_expanded(self):
+        url = reverse("courses:lesson_view", args=[self.lesson_1.id])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "active bg-primary text-white")
+        self.assertContains(response, f'id="collapse{self.module_1.id}"')
+        self.assertContains(response, "collapse show")
+        self.assertContains(response, "accordion-button collapsed")
+
+    def test_valid_video_embed_renders_iframe(self):
+        url = reverse("courses:lesson_view", args=[self.lesson_1.id])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ"')
+        self.assertNotContains(response, "Video link is not valid")
+
+    def test_invalid_video_embed_displays_fallback(self):
+        url = reverse("courses:lesson_view", args=[self.lesson_2.id])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Video link is not valid")
+        self.assertNotContains(response, "<iframe")
+
+    def test_no_video_shows_no_warning(self):
+        url = reverse("courses:lesson_view", args=[self.lesson_3.id])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Video link is not valid")
+        self.assertNotContains(response, "<iframe")
+
+    def test_lesson_notes_rendered_with_linebreaks(self):
+        url = reverse("courses:lesson_view", args=[self.lesson_1.id])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Installation")
+        self.assertContains(response, "Step 1: Install Python<br>Step 2: Install Django")
+
