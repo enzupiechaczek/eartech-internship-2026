@@ -42,7 +42,7 @@
 
     {% if q or selected_category %}
         <p class="text-muted mb-3">
-            {{ courses|length }} course{{ courses|length|pluralize }} found
+            {{ page_obj.paginator.count }} course{{ page_obj.paginator.count|pluralize }} found
             {% if q %}for &ldquo;{{ q }}&rdquo;{% endif %}
             {% if selected_category %}in {{ selected_category.name }}{% endif %}.
             <a class="ms-2" href="{% url 'courses:list' %}">Clear filters</a>
