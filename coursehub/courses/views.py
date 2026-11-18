@@ -72,12 +72,12 @@ def course_outline(request, pk):
     )
 
     is_enrolled = (
-        request.user.is_authenticated
-        and Enrollment.objects.filter(
-            student=request.user,
-            course=course,
-        ).exists()
-    )
+    request.user.is_authenticated
+    and Enrollment.objects.filter(
+        student=request.user,
+        course=course,
+    ).exists()
+)
 
     return render(
         request,
