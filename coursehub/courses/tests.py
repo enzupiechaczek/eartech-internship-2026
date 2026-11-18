@@ -784,20 +784,6 @@ class TogglePublishTests(TestCase):
         self.course.refresh_from_db()
         self.assertEqual(self.course.status, "DRAFT")
 
-def test_anonymous_user_is_redirected_from_studio(self):
-    response = self.client.get("/studio/")
-    self.assertEqual(response.status_code, 302)
-
-
-def test_student_cannot_access_studio(self):
-    self.client.force_login(self.student)
-
-    response = self.client.get("/studio/")
-
-    self.assertEqual(response.status_code, 403)
-
-
-
 class StudioViewAccessTests(TestCase):
     def setUp(self):
         User = get_user_model()
@@ -860,5 +846,3 @@ class StudioViewAccessTests(TestCase):
 
         self.assertEqual(courses.count(), 1)
         self.assertEqual(courses.first(), self.own_course)
-
-
