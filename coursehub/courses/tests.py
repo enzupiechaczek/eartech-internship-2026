@@ -1082,6 +1082,34 @@ class PublicCourseOutlineTests(TestCase):
         self.assertContains(response, "Meet Django")
         self.assertContains(response, "Install Django")
 
+    def test_guest_cannot_see_lesson_notes_on_public_outline(self):
+        secret_notes = "PRIVATE_NOTES_REGRESSION_CHECK"
+        self.first_lesson.notes = secret_notes
+        self.first_lesson.save(update_fields=["notes"])
+
+        response = self.client.get(self.outline_url())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, secret_notes)
+
+    def test_non_enrolled_student_cannot_see_lesson_notes_on_public_outline(self):
+        User = get_user_model()
+        student = User.objects.create_user(
+            username="outline_student",
+            password="testpass123",
+            role="STUDENT",
+        )
+
+        secret_notes = "PRIVATE_NOTES_REGRESSION_CHECK"
+        self.first_lesson.notes = secret_notes
+        self.first_lesson.save(update_fields=["notes"])
+
+        self.client.force_login(student)
+        response = self.client.get(self.outline_url())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, secret_notes)
+
     def test_outline_shows_module_and_lesson_totals(self):
         response = self.client.get(self.outline_url())
 
