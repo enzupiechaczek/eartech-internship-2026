@@ -12,6 +12,7 @@
                 My Dashboard
             </a>
         </li>
+        
 
         <li>
             <a href="{% url 'pending_requests' %}">
@@ -31,5 +32,20 @@
             </a>
         </li>
     </ul>
+     <hr>
+    <h3>My Appointments</h3>
+    
+    {% if appointments %}
+        <ul>
+        {% for appt in appointments %}
+            <li>
+                Patient: {{ appt.patient }} - Status: {{ appt.status }}
+                <a href="{% url 'records:start_visit' appt.pk %}">Start Visit</a>
+            </li>
+        {% endfor %}
+        </ul>
+    {% else %}
+        <p>No appointments found.</p>
+    {% endif %}
 
 {% endblock %}
