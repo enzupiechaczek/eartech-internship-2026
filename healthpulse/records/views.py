@@ -6,6 +6,8 @@ from django.core.exceptions import PermissionDenied
 from core.models import PatientProfile
 from .models import ClinicalEncounter
 from .permissions import require_relationship
+from appointments.models import Appointment
+from .forms import EncounterForm
 
 
 @login_required
@@ -66,3 +68,41 @@ def encounter_detail(request, encounter_id):
         "diagnosis": encounter.diagnosis,
         "treatment_notes": encounter.treatment_notes,
     })
+@login_required
+def start_visit(request, pk):
+    appt = get_object_or_404(Appointment, pk=pk)
+    if appt.status == "APPROVED":
+        appt.status = "IN_VISIT"
+        appt.save()
+        return redirect("records:encounter_form", pk=appt.pk)
+    return render(request, "visits/visit_detail.html", {"appt": appt})
+
+@login_required
+def encounter_form_view(request, pk):
+    appt = get_object_or_404(Appointment, pk=pk)
+    if request.method == "POST":
+        form = EncounterForm(request.POST)
+        if form.is_valid():
+            encounter = form.save(commit=False)
+            encounter.appointment = appt
+            encounter.patient = appt.patient
+            encounter.doctor = getattr(request.user, "doctorprofile", None)
+            encounter.save()
+            return redirect("records:patient_chart", patient_id=appt.patient.id)
+    else:
+        form = EncounterForm()
+    return render(request, "records/encounter_form.html", {"form": form, "appt": appt})
+@login_required
+def doctor_dashboard(request):
+  doctor = getattr(request.user, "doctorprofile", None)
+  if doctor is None:
+    raise PermissionDenied
+
+  # جلب المواعيد أو الزيارات الخاصة بهذا الدكتور
+  appointments = Appointment.objects.filter(
+      doctor=doctor
+  )  # أو حسب نموذج المواعيد لديكم
+
+  return render(
+      request, "doctor_dashboard.html", {"appointments": appointments}
+  )
