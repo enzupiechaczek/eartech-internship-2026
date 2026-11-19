@@ -32,6 +32,18 @@
         {% endif %}
     </header>
 
+    <section class="outline-rating-summary">
+        <h2>Course rating</h2>
+        {% if review_count %}
+            <p>
+                <strong>{{ average_rating|floatformat:1 }}/5</strong>
+                based on {{ review_count }} review{{ review_count|pluralize }}
+            </p>
+        {% else %}
+            <p>No reviews yet.</p>
+        {% endif %}
+    </section>
+
     <section class="outline-content">
         <div class="outline-content-head">
             <h2 class="outline-section-title">Course content</h2>
@@ -72,6 +84,24 @@
                 <h3>No modules yet</h3>
                 <p>This course is published but its outline is still being built.</p>
             </div>
+        {% endfor %}
+    </section>
+
+    <section id="reviews" class="outline-reviews">
+        <h2>Student reviews</h2>
+
+        {% for review in reviews %}
+            <article class="outline-review">
+                <p>
+                    <strong>{{ review.student.get_full_name|default:review.student.username }}</strong>
+                    <span>{{ review.rating }}/5</span>
+                </p>
+                {% if review.comment %}
+                    <p>{{ review.comment|linebreaksbr }}</p>
+                {% endif %}
+            </article>
+        {% empty %}
+            <p>No student reviews yet.</p>
         {% endfor %}
     </section>
 
