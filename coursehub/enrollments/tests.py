@@ -266,6 +266,88 @@ class StudentDashboardTests(TestCase):
         self.assertEqual(enrollment.completed_lessons, 0)
         self.assertEqual(enrollment.progress_percentage, 0)
 
+    def test_dashboard_shows_start_course_when_progress_is_zero(self):
+        Enrollment.objects.create(
+            student=self.student,
+            course=self.course,
+        )
+
+        self.client.force_login(self.student)
+
+        response = self.client.get(
+            reverse("enrollments:student_dashboard")
+        )
+
+        self.assertContains(response, "Start Course")
+
+    def test_dashboard_shows_continue_when_progress_is_greater_than_zero(self):
+        module = Module.objects.create(
+            course=self.course,
+            title="Module 1",
+        )
+        lesson1 = Lesson.objects.create(
+            module=module,
+            title="Lesson 1",
+        )
+        Lesson.objects.create(
+            module=module,
+            title="Lesson 2",
+        )
+
+        Enrollment.objects.create(
+            student=self.student,
+            course=self.course,
+        )
+
+        LessonProgress.objects.create(
+            student=self.student,
+            lesson=lesson1,
+        )
+
+        self.client.force_login(self.student)
+
+        response = self.client.get(
+            reverse("enrollments:student_dashboard")
+        )
+
+        self.assertContains(response, "Continue")
+        self.assertNotContains(response, "Start Course")
+
+    def test_dashboard_progress_is_isolated_between_students(self):
+        module = Module.objects.create(
+            course=self.course,
+            title="Module 1",
+        )
+        lesson1 = Lesson.objects.create(
+            module=module,
+            title="Lesson 1",
+        )
+        Lesson.objects.create(
+            module=module,
+            title="Lesson 2",
+        )
+
+        Enrollment.objects.create(
+            student=self.student,
+            course=self.course,
+        )
+        Enrollment.objects.create(
+            student=self.other_student,
+            course=self.course,
+        )
+
+        LessonProgress.objects.create(
+            student=self.other_student,
+            lesson=lesson1,
+        )
+
+        self.client.force_login(self.student)
+
+        response = self.client.get(
+            reverse("enrollments:student_dashboard")
+        )
+
+        self.assertContains(response, "Start Course")
 
     def test_progress_updates_when_student_completes_lesson(self):
         module = Module.objects.create(
@@ -381,6 +463,36 @@ class StudentDashboardTests(TestCase):
 
         self.assertEqual(enrollment2.completed_lessons, 0)
         self.assertEqual(enrollment2.progress_percentage, 0)
+
+    def test_student_can_open_own_enrollment(self):
+        module = Module.objects.create(
+            course=self.course,
+            title="Getting Started",
+            order=1,
+        )
+        Lesson.objects.create(
+            module=module,
+            title="Installing Python",
+            order=1,
+        )
+        enrollment = Enrollment.objects.create(
+            student=self.student,
+            course=self.course,
+        )
+
+        self.client.force_login(self.student)
+
+        response = self.client.get(
+            reverse(
+                "enrollments:course_detail",
+                kwargs={"enrollment_id": enrollment.pk},
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Python for Beginners")
+        self.assertContains(response, "Getting Started")
+        self.assertContains(response, "Installing Python")
 
     def test_student_cannot_open_other_student_enrollment(self):
         other_course = Course.objects.create(
