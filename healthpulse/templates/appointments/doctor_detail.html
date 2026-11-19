@@ -1,0 +1,148 @@
+{% load static %}
+<!DOCTYPE html><html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Doctor Profile | HealthPulse</title><style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: Arial, sans-serif;
+        background-color: #f4f7fb;
+        color: #263238;
+        line-height: 1.6;
+    }
+
+    .container {
+        max-width: 900px;
+        margin: 50px auto;
+        padding: 20px;
+    }
+
+    .doctor-card {
+        background: white;
+        border-radius: 16px;
+        padding: 35px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    }
+
+    .doctor-header {
+        display: flex;
+        align-items: center;
+        gap: 25px;
+        margin-bottom: 30px;
+    }
+
+    .doctor-image {
+        width: 150px;
+        height: 150px;
+        border-radius: 50%;
+        object-fit: cover;
+        background-color: #e8eef5;
+    }
+
+    .doctor-name {
+        font-size: 28px;
+        color: #176b87;
+        margin-bottom: 8px;
+    }
+
+    .specialty {
+        color: #607d8b;
+        font-size: 18px;
+    }
+
+    .section {
+        margin-top: 25px;
+    }
+
+    .section h2 {
+        color: #176b87;
+        font-size: 20px;
+        margin-bottom: 10px;
+    }
+
+    .section p {
+        color: #546e7a;
+    }
+
+    .book-button {
+        display: inline-block;
+        margin-top: 30px;
+        padding: 12px 25px;
+        background-color: #176b87;
+        color: white;
+        text-decoration: none;
+        border-radius: 8px;
+        font-weight: bold;
+    }
+
+    .book-button:hover {
+        background-color: #12546b;
+    }
+
+    @media (max-width: 600px) {
+        .doctor-header {
+            flex-direction: column;
+            text-align: center;
+        }
+
+        .doctor-card {
+            padding: 20px;
+        }
+    }
+</style>
+
+</head><body><div class="container">
+    <div class="doctor-card">
+
+        <div class="doctor-header">
+
+            {% if doctor.profile_picture %}
+                <img src="{{ doctor.profile_picture.url }}"
+                     alt="Doctor Profile Picture"
+                     class="doctor-image">
+            {% else %}
+                <div class="doctor-image"></div>
+            {% endif %}
+
+            <div>
+                <h1 class="doctor-name">
+                    Dr. {{ doctor.user.get_full_name }}
+                </h1>
+
+                <p class="specialty">
+                    {{ doctor.specialty }}
+                </p>
+            </div>
+
+        </div>
+
+        <div class="section">
+            <h2>About the Doctor</h2>
+            <p>{{ doctor.bio }}</p>
+        </div>
+
+        <div class="section">
+            <h2>Qualifications</h2>
+            <p>{{ doctor.qualifications }}</p>
+        </div>
+
+        <div class="section">
+            <h2>Clinic Location</h2>
+            <p>{{ doctor.clinic_branch }}</p>
+        </div>
+
+        <a href="#" class="book-button">
+            Book Appointment
+        </a>
+
+    </div>
+</div>
+
+</body>
+</html>
