@@ -31,8 +31,12 @@ class Enrollment(models.Model):
 
     @property
     def completed_lessons(self):
-        # LessonProgress is added in task 3322; until then nothing is completed.
-        return 0
+        from courses.models import LessonProgress
+
+        return LessonProgress.objects.filter(
+            student=self.student,
+            lesson__module__course=self.course,
+        ).count()
 
     @property
     def progress_percentage(self):
