@@ -2,34 +2,86 @@
 
 {% block content %}
 
-    <h1>Welcome Dr. {{ request.user.username }}</h1>
+<h1>Welcome Dr. {{ request.user.username }}</h1>
 
-    <h2>Quick Links</h2>
+<h2>Quick Links</h2>
 
-    <ul>
-        <li>
-            <a href="{% url 'doctor_dashboard' %}">
-                My Dashboard
-            </a>
-        </li>
+<ul>
+    <li>
+        <a href="{% url 'doctor_dashboard' %}">
+            My Dashboard
+        </a>
+    </li>
 
-        <li>
-            <a href="{% url 'pending_requests' %}">
-                Pending Requests
-            </a>
-        </li>
+    <li>
+        <a href="{% url 'pending_requests' %}">
+            Pending Requests
+        </a>
+    </li>
 
-        <li>
-            <a href="{% url 'patient_dashboard' %}">
-                Patient Dashboard
-            </a>
-        </li>
+    <li>
+        <a href="{% url 'patient_dashboard' %}">
+            Patient Dashboard
+        </a>
+    </li>
 
-        <li>
-            <a href="{% url 'admin:index' %}">
-                Admin Panel
-            </a>
-        </li>
-    </ul>
+    <li>
+        <a href="{% url 'admin:index' %}">
+            Admin Panel
+        </a>
+    </li>
+</ul>
+
+<h2 class="mt-4">Approved and Active Appointments</h2>
+{% if appointments %}
+<div class="table-responsive">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Patient</th>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Reason</th>
+                <th>Encounter</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for appointment in appointments %}
+            <tr>
+                <td>{{ appointment.patient.user.get_full_name|default:appointment.patient.user.username }}</td>
+                <td>{{ appointment.appointment_date|date:"j M Y" }}</td>
+                <td>{{ appointment.time_slot|time:"H:i" }}</td>
+                <td>{{ appointment.reason_for_visit }}</td>
+                <td>
+                    {% if appointment.existing_encounter %}
+                    <a href="{% url 'encounter_edit' appointment.existing_encounter.pk %}"
+                        class="btn btn-sm btn-outline-primary">
+                        Edit Encounter
+                    </a>
+
+                    {% elif appointment.status == "APPROVED" %}
+                    <form method="post" action="{% url 'start_visit' appointment.pk %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-success">
+                            Start Visit
+                        </button>
+                    </form>
+
+                    {% elif appointment.status == "IN_VISIT" %}
+                    <a href="{% url 'encounter_create' appointment.pk %}" class="btn btn-sm btn-primary">
+                        Create Encounter
+                    </a>
+
+                    {% else %}
+                    <span>No encounter available</span>
+                    {% endif %}
+                </td>
+                {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p>No approved or active appointments.</p>
+{% endif %}
 
 {% endblock %}

@@ -2,38 +2,85 @@
 
 {% block content %}
 
-    <h1>Pending Requests</h1>
+<h1>Pending Requests</h1>
 
-    {% if appts %}
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Patient</th>
-                <th>Date</th>
-                <th>Time</th>
-                <th>Reason</th>
-                <th>Status</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for a in appts %}
-            <tr id="appt-{{ a.pk }}">
-                <td>{{ a.patient.user.get_full_name|default:a.patient.user.username }}</td>
-                <td>{{ a.appointment_date|date:"j M" }}</td>
-                <td>{{ a.time_slot|time:"H:i" }}</td>
-                <td>{{ a.reason_for_visit|truncatewords:8 }}</td>
-                <td class="status">Pending</td>
-                <td>
-                    <button class="btn btn-sm btn-success act" data-id="{{ a.pk }}" data-action="APPROVED">Approve</button>
-                    <button class="btn btn-sm btn-danger act" data-id="{{ a.pk }}" data-action="REJECTED">Reject</button>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <p>No pending requests.</p>
-    {% endif %}
+{% if appts %}
+<table class="table">
+    <thead>
+        <tr>
+            <th>Patient</th>
+            <th>Date</th>
+            <th>Time</th>
+            <th>Reason</th>
+            <th>Status</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for a in appts %}
+        <tr id="appt-{{ a.pk }}">
+            <td>{{ a.patient.user.get_full_name|default:a.patient.user.username }}</td>
+            <td>{{ a.appointment_date|date:"j M" }}</td>
+            <td>{{ a.time_slot|time:"H:i" }}</td>
+            <td>{{ a.reason_for_visit|truncatewords:8 }}</td>
+            <td class="status">Pending</td>
+            <td>
+                <button class="btn btn-sm btn-success act" data-id="{{ a.pk }}" data-action="APPROVED">Approve</button>
+                <button class="btn btn-sm btn-danger act" data-id="{{ a.pk }}" data-action="REJECTED">Reject</button>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No pending requests.</p>
+{% endif %}
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        document.querySelectorAll(".act").forEach(button => {
+            button.addEventListener("click", async function () {
+                const appointmentId = this.dataset.id;
+                const action = this.dataset.action;
+                const row = document.getElementById(`appt-${appointmentId}`);
+
+                const csrfToken = document.cookie
+                    .split("; ")
+                    .find(item => item.startsWith("csrftoken="))
+                    ?.split("=")[1];
+
+                this.disabled = true;
+
+                try {
+                    const response = await fetch(
+                        `/api/appointments/${appointmentId}/status/`,
+                        {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                                "X-CSRFToken": csrfToken
+                            },
+                            body: JSON.stringify({ status: action })
+                        }
+                    );
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.error || "Request failed");
+                    }
+
+                    row.querySelector(".status").textContent = data.status;
+                    row.querySelectorAll(".act").forEach(btn => btn.remove());
+
+                } catch (error) {
+                    alert("Could not update appointment: " + error.message);
+                    this.disabled = false;
+                }
+            });
+        });
+    });
+</script>
+
 
 {% endblock %}

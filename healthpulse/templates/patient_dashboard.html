@@ -1,4 +1,3 @@
-
 {% extends 'base.html' %}
 
 {% block content %}
@@ -15,7 +14,11 @@
 <hr>
 
 <h2 class="mb-3">My Appointments</h2>
-
+<div class="mb-3">
+    <a href="{% url 'doctor_directory' %}" class="btn btn-primary">
+        + Add Appointment
+    </a>
+</div>
 <div class="table-responsive">
     <table class="table table-hover">
         <thead>
@@ -41,29 +44,29 @@
 
                 <td>
                     {% if a.status == 'APPROVED' %}
-                        <span class="badge bg-success">
-                            {{ a.get_status_display }}
-                        </span>
+                    <span class="badge bg-success">
+                        {{ a.get_status_display }}
+                    </span>
 
                     {% elif a.status == 'REJECTED' %}
-                        <span class="badge bg-danger">
-                            {{ a.get_status_display }}
-                        </span>
+                    <span class="badge bg-danger">
+                        {{ a.get_status_display }}
+                    </span>
 
                     {% elif a.status == 'COMPLETED' %}
-                        <span class="badge bg-primary">
-                            {{ a.get_status_display }}
-                        </span>
+                    <span class="badge bg-primary">
+                        {{ a.get_status_display }}
+                    </span>
 
                     {% elif a.status == 'IN_VISIT' %}
-                        <span class="badge bg-info text-dark">
-                            {{ a.get_status_display }}
-                        </span>
+                    <span class="badge bg-info text-dark">
+                        {{ a.get_status_display }}
+                    </span>
 
                     {% else %}
-                        <span class="badge bg-warning text-dark">
-                            {{ a.get_status_display }}
-                        </span>
+                    <span class="badge bg-warning text-dark">
+                        {{ a.get_status_display }}
+                    </span>
                     {% endif %}
                 </td>
             </tr>
@@ -80,4 +83,3 @@
 </div>
 
 {% endblock %}
-

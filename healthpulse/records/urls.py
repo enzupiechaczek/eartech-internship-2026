@@ -1,3 +1,4 @@
+
 from django.urls import path
 from . import views
 
@@ -13,8 +14,23 @@ urlpatterns = [
         name="encounter_detail",
     ),
     path(
-    "encounters/<int:encounter_id>/complete/",
-    views.complete_encounter,
-    name="complete_encounter",
+        "encounters/<int:encounter_id>/complete/",
+        views.complete_encounter,
+        name="complete_encounter",
+    ),
+    path(
+        "appointments/<int:appointment_id>/encounter/create/",
+        views.encounter_create,
+        name="encounter_create",
+    ),
+    path(
+        "encounters/<int:encounter_id>/edit/",
+        views.encounter_edit,
+        name="encounter_edit",
+    ),
+    path(
+        "appointments/<int:pk>/start/",
+        views.start_visit,
+        name="start_visit",
     ),
 ]
