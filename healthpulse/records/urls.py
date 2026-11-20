@@ -22,4 +22,9 @@ urlpatterns = [
         views.encounter_edit,
         name="encounter_edit",
     ),
+    path(
+        "appointments/<int:pk>/start/",
+        views.start_visit,
+        name="start_visit",
+    ),
 ]

@@ -168,3 +168,34 @@ def encounter_edit(request, encounter_id):
         "records/encounter_form.html",
         {"form": form, "formset": formset, "encounter": encounter},
     )
+
+@doctor_required
+def start_visit(request, pk):
+    from appointments.models import Appointment
+
+    if request.method != "POST":
+        raise PermissionDenied("Starting a visit requires POST.")
+
+    appointment = get_object_or_404(
+        Appointment,
+        pk=pk,
+        doctor=request.user.doctorprofile,
+    )
+
+    if appointment.status == Appointment.Status.APPROVED:
+        require_relationship(
+            request.user.doctorprofile,
+            appointment.patient,
+        )
+        appointment.status = Appointment.Status.IN_VISIT
+        appointment.save(update_fields=["status"])
+
+    elif appointment.status != Appointment.Status.IN_VISIT:
+        raise PermissionDenied(
+            "Only approved appointments can be started."
+        )
+
+    return redirect(
+        "encounter_create",
+        appointment_id=appointment.pk,
+    )
