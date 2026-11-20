@@ -13,6 +13,7 @@ import os
 from django.http import FileResponse, Http404
 from .models import MedicalFile
 from .permissions import has_relationship
+from .forms import ClinicalEncounterForm, PrescriptionFormSet, MedicalFileForm
 
 @login_required
 def patient_medical_chart(request, patient_id):
@@ -201,6 +202,59 @@ def start_visit(request, pk):
     return redirect(
         "encounter_create",
         appointment_id=appointment.pk,
+    )
+
+
+@login_required
+def download_file(request, pk):
+    medical_file = get_object_or_404(MedicalFile, pk=pk)
+
+    patient = (
+        getattr(medical_file, "patient", None)
+        or getattr(getattr(medical_file, "encounter", None), "patient", None)
+    )
+
+    patient_profile = getattr(request.user, "patientprofile", None)
+    doctor_profile = getattr(request.user, "doctorprofile", None)
+
+    is_owner = patient_profile is not None and patient_profile == patient
+    is_authorized_doctor = (
+        doctor_profile is not None
+        and patient is not None
+        and has_relationship(doctor_profile, patient)
+    )
+
+    if not (is_owner or is_authorized_doctor):
+        raise PermissionDenied("You do not have permission to access this medical file.")
+
+    if not medical_file.file or not os.path.exists(medical_file.file.path):
+        raise Http404("Requested file not found.")
+
+    return FileResponse(
+        medical_file.file.open("rb"),
+        as_attachment=False,
+        filename=os.path.basename(medical_file.file.name),
+    )
+@doctor_required
+def medical_file_upload(request, patient_id):
+    patient = get_object_or_404(PatientProfile, id=patient_id)
+
+    require_relationship(request.user.doctorprofile, patient)
+
+    if request.method == "POST":
+        form = MedicalFileForm(request.POST, request.FILES)
+        if form.is_valid():
+            medical_file = form.save(commit=False)
+            medical_file.patient = patient
+            medical_file.save()
+            return redirect("patient_medical_chart", patient_id=patient.id)
+    else:
+        form = MedicalFileForm()
+
+    return render(
+        request,
+        "records/medical_file_upload.html",
+        {"form": form, "patient": patient},
     )
 @login_required
 def download_file(request, pk):

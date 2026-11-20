@@ -31,3 +31,4 @@ def role_required(*roles):
 
 doctor_required = role_required(User.Role.DOCTOR)
 patient_required = role_required(User.Role.PATIENT)
+

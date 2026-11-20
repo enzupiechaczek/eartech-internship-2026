@@ -29,3 +29,10 @@ PrescriptionFormSet = inlineformset_factory(
 
 # Descriptive alias for callers that prefer an explicit inline formset name.
 PrescriptionInlineFormSet = PrescriptionFormSet
+from .models import MedicalFile
+
+
+class MedicalFileForm(forms.ModelForm):
+    class Meta:
+        model = MedicalFile
+        fields = ["title", "file_type", "file"]
