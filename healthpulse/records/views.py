@@ -9,7 +9,7 @@ from core.models import PatientProfile
 from .models import ClinicalEncounter
 from .permissions import AUTH_STATUSES, require_relationship
 from .forms import ClinicalEncounterForm, PrescriptionFormSet
-
+from .forms import ClinicalEncounterForm, PrescriptionFormSet, MedicalFileForm
 
 @login_required
 def patient_medical_chart(request, patient_id):
@@ -198,4 +198,25 @@ def start_visit(request, pk):
     return redirect(
         "encounter_create",
         appointment_id=appointment.pk,
+    )
+@doctor_required
+def medical_file_upload(request, patient_id):
+    patient = get_object_or_404(PatientProfile, id=patient_id)
+
+    require_relationship(request.user.doctorprofile, patient)
+
+    if request.method == "POST":
+        form = MedicalFileForm(request.POST, request.FILES)
+        if form.is_valid():
+            medical_file = form.save(commit=False)
+            medical_file.patient = patient
+            medical_file.save()
+            return redirect("patient_medical_chart", patient_id=patient.id)
+    else:
+        form = MedicalFileForm()
+
+    return render(
+        request,
+        "records/medical_file_upload.html",
+        {"form": form, "patient": patient},
     )

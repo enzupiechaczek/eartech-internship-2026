@@ -3,7 +3,10 @@
 
 from django.db import models
 from django.core.validators import FileExtensionValidator
-
+from django.core.exceptions import ValidationError
+def validate_file_size(file):
+    if file.size > 10 * 1024 * 1024:
+        raise ValidationError("Maximum file size is 10 MB.")
 
 class ClinicalEncounter(models.Model):
     appointment = models.OneToOneField(
@@ -50,6 +53,15 @@ class Prescription(models.Model):
 
 
 class MedicalFile(models.Model):
+    file = models.FileField(
+    upload_to="medical/%Y/%m/",
+    validators=[
+        FileExtensionValidator(
+            allowed_extensions=["pdf", "jpg", "jpeg", "png"]
+        ),
+        validate_file_size,
+    ],
+)
 
     class Type(models.TextChoices):
         XRAY = "XRAY", "X-Ray"

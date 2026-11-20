@@ -27,4 +27,9 @@ urlpatterns = [
         views.start_visit,
         name="start_visit",
     ),
+    path(
+    "patients/<int:patient_id>/files/upload/",
+    views.medical_file_upload,
+    name="medical_file_upload",
+),
 ]
