@@ -2,7 +2,7 @@ from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
 from django.urls import reverse
-
+from unittest.mock import patch
 from core.models import DoctorProfile, PatientProfile
 from appointments.models import Appointment
 from .forms import ClinicalEncounterForm, PrescriptionFormSet
@@ -936,3 +936,272 @@ class PrescriptionTests(TestCase):
             url,
             f"/records/encounters/{self.encounter.id}/",
         )
+
+    def test_completed_encounter_cannot_be_edited(self):
+        # 1. Mark the appointment as completed
+        self.appointment.status = Appointment.Status.COMPLETED
+        self.appointment.save(update_fields=["status"])
+
+        # 2. Create an existing prescription
+        prescription = Prescription.objects.create(
+            encounter=self.encounter,
+            medication_name="Aspirin",
+            dosage="81mg",
+            frequency="Once daily",
+            duration="30 days",
+        )
+
+        # 3. Save the original diagnosis
+        original_diagnosis = self.encounter.diagnosis
+
+        # 4. Log in as the doctor
+        self.client.force_login(self.doctor_user)
+
+        # 5. Try to edit the completed encounter
+        response = self.client.post(
+            reverse(
+                "encounter_edit",
+                kwargs={"encounter_id": self.encounter.id},
+            ),
+            {"diagnosis": "Updated diagnosis"},
+        )
+
+        # 6. Check that access is denied
+        self.assertEqual(response.status_code, 403)
+
+        # 7. Refresh the data from the database
+        self.encounter.refresh_from_db()
+        prescription.refresh_from_db()
+
+        # 8. Make sure nothing was changed
+        self.assertEqual(
+            self.encounter.diagnosis,
+            original_diagnosis,
+        )
+        self.assertEqual(
+            prescription.medication_name,
+            "Aspirin",
+        )
+
+
+    def test_completed_encounter_cannot_add_prescription(self):
+        # 1. Mark the appointment as completed
+        self.appointment.status = Appointment.Status.COMPLETED
+        self.appointment.save(update_fields=["status"])
+
+        # 2. Log in as the doctor
+        self.client.force_login(self.doctor_user)
+
+        # 3. Try to add a new prescription
+        response = self.client.post(
+            reverse(
+                "encounter_edit",
+                kwargs={"encounter_id": self.encounter.id},
+            ),
+            {
+                "chief_complaint": "Headache",
+                "diagnosis": "Migraine",
+                "treatment_notes": "Rest",
+
+                "prescriptions-TOTAL_FORMS": "1",
+                "prescriptions-INITIAL_FORMS": "0",
+                "prescriptions-MIN_NUM_FORMS": "0",
+                "prescriptions-MAX_NUM_FORMS": "1000",
+
+                "prescriptions-0-medication_name": "New Medicine",
+                "prescriptions-0-dosage": "10mg",
+                "prescriptions-0-frequency": "Once daily",
+                "prescriptions-0-duration": "5 days",
+                "prescriptions-0-instructions": "",
+            },
+        )
+
+        # 4. Check that the request is rejected
+        self.assertEqual(response.status_code, 403)
+
+        # 5. Make sure no prescription was created
+        self.assertEqual(
+            self.encounter.prescriptions.count(),
+            0,
+        )
+
+    def test_completed_encounter_cannot_delete_prescription(self):
+        # 1. Complete the appointment
+        self.appointment.status = Appointment.Status.COMPLETED
+        self.appointment.save(update_fields=["status"])
+
+        # 2. Create an existing prescription
+        prescription = Prescription.objects.create(
+            encounter=self.encounter,
+            medication_name="Aspirin",
+            dosage="81mg",
+            frequency="Once daily",
+            duration="30 days",
+        )
+
+        # 3. Log in as the doctor
+        self.client.force_login(self.doctor_user)
+
+        # 4. Try to delete the prescription
+        response = self.client.post(
+            reverse(
+                "encounter_edit",
+                kwargs={"encounter_id": self.encounter.id},
+            ),
+            {
+                "chief_complaint": self.encounter.chief_complaint,
+                "diagnosis": self.encounter.diagnosis,
+                "treatment_notes": self.encounter.treatment_notes,
+
+                "prescriptions-TOTAL_FORMS": "1",
+                "prescriptions-INITIAL_FORMS": "1",
+                "prescriptions-MIN_NUM_FORMS": "0",
+                "prescriptions-MAX_NUM_FORMS": "1000",
+
+                "prescriptions-0-id": str(prescription.id),
+                "prescriptions-0-medication_name": "Aspirin",
+                "prescriptions-0-dosage": "81mg",
+                "prescriptions-0-frequency": "Once daily",
+                "prescriptions-0-duration": "30 days",
+                "prescriptions-0-instructions": "",
+                "prescriptions-0-DELETE": "on",
+            },
+        )
+
+        # 5. Check that the request is rejected
+        self.assertEqual(response.status_code, 403)
+
+        # 6. Make sure the prescription still exists
+        self.assertTrue(
+            Prescription.objects.filter(
+                pk=prescription.pk
+            ).exists()
+        )
+
+    @patch(
+        "records.views.PrescriptionFormSet.save",
+        side_effect=RuntimeError("Simulated prescription save failure"),
+    )
+    def test_create_view_rolls_back_encounter_when_prescription_save_fails(
+        self, mock_save
+    ):
+        # 1. Create an approved appointment
+        appointment = Appointment.objects.create(
+            doctor=self.doctor,
+            patient=self.patient,
+            appointment_date="2026-11-23",
+            time_slot="11:00",
+            reason_for_visit="General checkup",
+            status=Appointment.Status.APPROVED,
+        )
+
+        # 2. Log in as the doctor
+        self.client.force_login(self.doctor_user)
+
+        # 3. Capture the server error as a response
+        self.client.raise_request_exception = False
+
+        # 4. Submit valid encounter and prescription data
+        response = self.client.post(
+            reverse(
+                "encounter_create",
+                kwargs={"appointment_id": appointment.id},
+            ),
+            {
+                "chief_complaint": "Headache",
+                "diagnosis": "Migraine",
+                "treatment_notes": "Rest",
+
+                "prescriptions-TOTAL_FORMS": "1",
+                "prescriptions-INITIAL_FORMS": "0",
+                "prescriptions-MIN_NUM_FORMS": "0",
+                "prescriptions-MAX_NUM_FORMS": "1000",
+
+                "prescriptions-0-medication_name": "Aspirin",
+                "prescriptions-0-dosage": "81mg",
+                "prescriptions-0-frequency": "Once daily",
+                "prescriptions-0-duration": "30 days",
+                "prescriptions-0-instructions": "",
+            },
+        )
+
+        # 5. Check that the save operation failed
+        self.assertEqual(response.status_code, 500)
+        mock_save.assert_called_once()
+
+        # 6. Make sure the encounter was rolled back
+        self.assertFalse(
+            ClinicalEncounter.objects.filter(
+                appointment=appointment
+            ).exists()
+        )
+
+    def test_edit_view_rolls_back_changes_when_prescription_save_fails(self):
+        # Create an existing prescription
+        prescription = Prescription.objects.create(
+            encounter=self.encounter,
+            medication_name="Aspirin",
+            dosage="81mg",
+            frequency="Once daily",
+            duration="30 days",
+        )
+
+        original_diagnosis = self.encounter.diagnosis
+        original_frequency = prescription.frequency
+
+        self.client.force_login(self.doctor_user)
+        self.client.raise_request_exception = False
+
+        original_save = PrescriptionFormSet.save
+
+        def save_then_fail(formset, *args, **kwargs):
+            original_save(formset, *args, **kwargs)
+            raise RuntimeError("Simulated save failure")
+
+        with patch(
+            "records.views.PrescriptionFormSet.save",
+            autospec=True,
+            side_effect=save_then_fail,
+        ) as mock_save:
+
+            response = self.client.post(
+                reverse(
+                    "encounter_edit",
+                    kwargs={"encounter_id": self.encounter.id},
+                ),
+                {
+                    "chief_complaint": self.encounter.chief_complaint,
+                    "diagnosis": "Updated diagnosis",
+                    "treatment_notes": self.encounter.treatment_notes,
+
+                    "prescriptions-TOTAL_FORMS": "1",
+                    "prescriptions-INITIAL_FORMS": "1",
+                    "prescriptions-MIN_NUM_FORMS": "0",
+                    "prescriptions-MAX_NUM_FORMS": "1000",
+
+                    "prescriptions-0-id": str(prescription.id),
+                    "prescriptions-0-medication_name": "Aspirin",
+                    "prescriptions-0-dosage": "81mg",
+                    "prescriptions-0-frequency": "Twice daily",
+                    "prescriptions-0-duration": "30 days",
+                    "prescriptions-0-instructions": "",
+                },
+            )
+
+        self.assertEqual(response.status_code, 500)
+        mock_save.assert_called_once()
+
+        self.encounter.refresh_from_db()
+        prescription.refresh_from_db()
+
+        self.assertEqual(
+            self.encounter.diagnosis,
+            original_diagnosis,
+        )
+        self.assertEqual(
+            prescription.frequency,
+            original_frequency,
+        )
+
+
+
