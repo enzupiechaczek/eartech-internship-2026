@@ -1,14 +1,22 @@
+
+
+
 from django import forms
 from django.contrib import messages
-from django.http import HttpResponse
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
+from django.db.models import Avg, Count
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.views.decorators.http import require_POST
 from django.views.generic.edit import CreateView, UpdateView
+
 from accounts.decorators import InstructorRequiredMixin, instructor_required
+from enrollments.models import Enrollment
+
 from .forms import CourseForm, LessonForm, ModuleForm
-from .models import Course, Lesson, Module
-from django.views.generic import ListView
+from .models import Course, Lesson, Module, LessonProgress
 
 
 class CourseFormMixin:
@@ -50,13 +58,110 @@ class CourseUpdateView(InstructorRequiredMixin, CourseFormMixin, UpdateView):
 
 
 def course_list(request):
-    return HttpResponse('Courses app is working ✅')
+    return HttpResponse("Courses app is working")
+
+
+def course_outline(request, pk):
+    """Public, read-only curriculum outline for a published course."""
+    course = get_object_or_404(
+        Course.objects.select_related("instructor", "category").annotate(
+            average_rating=Avg("reviews__rating"),
+            review_count=Count("reviews"),
+        ),
+        pk=pk,
+        status=Course.Status.PUBLISHED,
+    )
+    modules = course.modules.prefetch_related("lessons").all()
+    reviews = course.reviews.select_related("student").all()
+
+    is_instructor = (
+        request.user.is_authenticated
+        and course.instructor_id == request.user.id
+    )
+
+    is_enrolled = (
+        request.user.is_authenticated
+        and Enrollment.objects.filter(
+            student=request.user,
+            course=course,
+        ).exists()
+    )
+
+    return render(
+        request,
+        "courses/course_outline.html",
+        {
+            "course": course,
+            "modules": modules,
+            "lesson_count": sum(
+                len(module.lessons.all()) for module in modules
+            ),
+            "is_instructor": is_instructor,
+            "is_enrolled": is_enrolled,
+            "average_rating": course.average_rating,
+            "review_count": course.review_count,
+            "reviews": reviews,
+        },
+    )
+
+
+@login_required
+def lesson_view(request, lesson_id):
+    """Show lesson content only to the course instructor or enrolled students."""
+    lesson = get_object_or_404(
+        Lesson.objects.select_related("module__course"),
+        pk=lesson_id,
+    )
+    course = lesson.module.course
+
+    is_instructor = (
+        request.user.is_authenticated
+        and course.instructor_id == request.user.id
+    )
+
+    is_enrolled = (
+        request.user.is_authenticated
+        and Enrollment.objects.filter(
+            student=request.user,
+            course=course,
+        ).exists()
+    )
+
+    if not is_instructor and not is_enrolled:
+        raise PermissionDenied
+
+    if course.status != Course.Status.PUBLISHED and not is_instructor:
+        raise PermissionDenied
+
+    completion_percent = course.get_completion_percentage(request.user)
+
+    is_lesson_completed = LessonProgress.objects.filter(
+        student=request.user,
+        lesson=lesson,
+    ).exists()
+
+    return render(
+        request,
+        "courses/lesson_detail.html",
+        {
+            "lesson": lesson,
+            "course": course,
+            "completion_percent": completion_percent,
+            "is_lesson_completed": is_lesson_completed,
+            "is_enrolled": is_enrolled,
+            "is_instructor": is_instructor,
+        },
+    )
 
 
 def home(request):
     courses = (
         Course.objects.filter(status=Course.Status.PUBLISHED)
-        .select_related("instructor")
+        .select_related("instructor", "category")
+        .annotate(
+            average_rating=Avg("reviews__rating"),
+            review_count=Count("reviews"),
+        )
         .order_by("-created_at")[:8]
     )
     return render(request, "home.html", {"courses": courses})
@@ -253,3 +358,32 @@ def toggle_publish(request, pk):
     course.save(update_fields=["status"])
     return redirect("studio")
 
+
+@login_required
+@require_POST
+def complete_lesson(request, lesson_id):
+    """Mark a lesson as complete via AJAX."""
+    lesson = get_object_or_404(Lesson, pk=lesson_id)
+    course = lesson.module.course
+
+    is_enrolled = Enrollment.objects.filter(
+        student=request.user,
+        course=course,
+    ).exists()
+
+    if not is_enrolled:
+        return JsonResponse({"error": "Not enrolled"}, status=403)
+
+    if course.status != Course.Status.PUBLISHED:
+        return JsonResponse({"error": "Course is not published"}, status=403)
+
+    LessonProgress.objects.get_or_create(
+        student=request.user,
+        lesson=lesson,
+    )
+
+    percent = course.get_completion_percentage(request.user)
+
+    return JsonResponse(
+        {"lesson": lesson_id, "percent": percent, "completed": True}
+    )

@@ -1,14 +1,15 @@
 from django import forms
 from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import UploadedFile
 from .models import Course, Lesson, Module
 
 
 MAX_THUMBNAIL_SIZE = 2 * 1024 * 1024
-
+ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
 
 def validate_thumbnail_size(image):
-    if image and image.size > MAX_THUMBNAIL_SIZE:
-        raise ValidationError("Image must be under 2 MB.")
+    if isinstance(image, UploadedFile) and image.size > MAX_THUMBNAIL_SIZE:
+        raise ValidationError("Thumbnail must be 2MB or smaller.")
     return image
 
 
@@ -24,10 +25,19 @@ class CourseForm(forms.ModelForm):
             "thumbnail",
         ]
 
+    
     def clean_thumbnail(self):
-        return validate_thumbnail_size(
-            self.cleaned_data.get("thumbnail")
-        )
+        thumbnail = self.cleaned_data.get("thumbnail")
+
+        if isinstance(thumbnail, UploadedFile):
+            extension = thumbnail.name.rsplit(".", 1)[-1].lower()
+
+            if extension not in ALLOWED_EXTENSIONS:
+                raise forms.ValidationError(
+                    "Only JPG, JPEG, PNG, and WEBP images are allowed."
+                )
+
+        return validate_thumbnail_size(thumbnail)
 
 
 class ModuleForm(forms.ModelForm):
