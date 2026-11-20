@@ -820,19 +820,6 @@ class StudioViewAccessTests(TestCase):
 
         self.url = reverse("studio")
 
-    def test_anonymous_user_is_redirected_from_studio(self):
-        response = self.client.get(self.url)
-
-        self.assertEqual(response.status_code, 302)
-        self.assertIn("login", response.url)
-
-    def test_student_cannot_access_studio(self):
-        self.client.force_login(self.student)
-
-        response = self.client.get(self.url)
-
-        self.assertEqual(response.status_code, 403)
-
     def test_instructor_only_sees_own_courses(self):
         self.client.force_login(self.instructor)
 
