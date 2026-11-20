@@ -27,4 +27,9 @@ urlpatterns = [
         views.start_visit,
         name="start_visit",
     ),
+    path(
+        "files/<int:pk>/",
+        views.download_file,
+        name="download_file",
+    ),
 ]
