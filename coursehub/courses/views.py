@@ -1,6 +1,3 @@
-
-
-
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -17,6 +14,7 @@ from enrollments.models import Enrollment
 
 from .forms import CourseForm, LessonForm, ModuleForm
 from .models import Course, Lesson, Module, LessonProgress
+from django.views.generic import ListView
 
 
 class CourseFormMixin:
