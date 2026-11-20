@@ -12,4 +12,9 @@ urlpatterns = [
         views.encounter_detail,
         name="encounter_detail",
     ),
+    path(
+    "encounters/<int:encounter_id>/complete/",
+    views.complete_encounter,
+    name="complete_encounter",
+    ),
 ]
