@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Encounter Details</h1>
+
+<dl class="row">
+    <dt class="col-sm-3">Visit Date</dt>
+    <dd class="col-sm-9">{{ encounter.visit_date|date:"j M Y" }}</dd>
+
+    <dt class="col-sm-3">Chief Complaint</dt>
+    <dd class="col-sm-9">{{ encounter.chief_complaint }}</dd>
+
+    <dt class="col-sm-3">Diagnosis</dt>
+    <dd class="col-sm-9">{{ encounter.diagnosis }}</dd>
+
+    <dt class="col-sm-3">Treatment Notes</dt>
+    <dd class="col-sm-9">{{ encounter.treatment_notes|default:"None" }}</dd>
+</dl>
+
+<h2>Prescriptions</h2>
+{% if encounter.prescriptions.all %}
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Medication</th>
+                    <th>Dosage</th>
+                    <th>Frequency</th>
+                    <th>Duration</th>
+                    <th>Instructions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for prescription in encounter.prescriptions.all %}
+                    <tr>
+                        <td>{{ prescription.medication_name }}</td>
+                        <td>{{ prescription.dosage }}</td>
+                        <td>{{ prescription.frequency }}</td>
+                        <td>{{ prescription.duration }}</td>
+                        <td>{{ prescription.instructions|default:"None" }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% else %}
+    <p>No prescriptions.</p>
+{% endif %}
+
+<a href="{% url 'encounter_edit' encounter.pk %}" class="btn btn-primary">
+    Edit Encounter
+</a>
+{% endblock %}
