@@ -1,53 +1,107 @@
 {% extends "base.html" %}
 
+{% block title %}Encounter #{{ encounter.pk }} | HealthPulse{% endblock %}
+
 {% block content %}
-<h1>Encounter Details</h1>
+<a href="{% url 'doctor_dashboard' %}" class="hp-back">&larr; Back to dashboard</a>
 
-<dl class="row">
-    <dt class="col-sm-3">Visit Date</dt>
-    <dd class="col-sm-9">{{ encounter.visit_date|date:"j M Y" }}</dd>
-
-    <dt class="col-sm-3">Chief Complaint</dt>
-    <dd class="col-sm-9">{{ encounter.chief_complaint }}</dd>
-
-    <dt class="col-sm-3">Diagnosis</dt>
-    <dd class="col-sm-9">{{ encounter.diagnosis }}</dd>
-
-    <dt class="col-sm-3">Treatment Notes</dt>
-    <dd class="col-sm-9">{{ encounter.treatment_notes|default:"None" }}</dd>
-</dl>
-
-<h2>Prescriptions</h2>
-{% if encounter.prescriptions.all %}
-    <div class="table-responsive">
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Medication</th>
-                    <th>Dosage</th>
-                    <th>Frequency</th>
-                    <th>Duration</th>
-                    <th>Instructions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for prescription in encounter.prescriptions.all %}
-                    <tr>
-                        <td>{{ prescription.medication_name }}</td>
-                        <td>{{ prescription.dosage }}</td>
-                        <td>{{ prescription.frequency }}</td>
-                        <td>{{ prescription.duration }}</td>
-                        <td>{{ prescription.instructions|default:"None" }}</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+<section class="hp-page-head">
+    <div>
+        <p class="hp-eyebrow">Encounter · {{ encounter.appointment.appointment_date|date:"j M Y" }}</p>
+        <h1>
+            <a href="{% url 'patient_medical_chart' encounter.patient_id %}" class="text-decoration-none" style="color: inherit;">
+                {{ encounter.patient.user.get_full_name|default:encounter.patient.user.username }}
+            </a>
+        </h1>
+        <p>Reason for visit: {{ encounter.appointment.reason_for_visit }}</p>
     </div>
-{% else %}
-    <p>No prescriptions.</p>
-{% endif %}
+    {% include "includes/status.html" with appt=encounter.appointment %}
+</section>
 
-<a href="{% url 'encounter_edit' encounter.pk %}" class="btn btn-primary">
-    Edit Encounter
-</a>
+<div class="hp-split">
+    <div class="hp-split__main">
+        <section class="hp-card">
+            <div class="hp-facts">
+                <div>
+                    <p class="hp-field-label">Chief complaint</p>
+                    <p class="hp-field-value">{{ encounter.chief_complaint }}</p>
+                </div>
+                <div>
+                    <p class="hp-field-label">Diagnosis</p>
+                    <p class="hp-field-value hp-serif" style="font-size: 1.375rem;">{{ encounter.diagnosis }}</p>
+                </div>
+                <div class="is-wide">
+                    <p class="hp-field-label">Treatment notes</p>
+                    <p class="hp-field-value mb-0">{{ encounter.treatment_notes|default:"—" }}</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="hp-card hp-card--flush">
+            <div class="hp-card__head"><h2>Prescriptions</h2></div>
+            {% if encounter.prescriptions.all %}
+            <div class="hp-table-wrap">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Medication</th>
+                            <th>Dosage</th>
+                            <th>Frequency</th>
+                            <th>Duration</th>
+                            <th>Instructions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for prescription in encounter.prescriptions.all %}
+                        <tr>
+                            <td class="fw-semibold">{{ prescription.medication_name }}</td>
+                            <td>{{ prescription.dosage }}</td>
+                            <td>{{ prescription.frequency }}</td>
+                            <td>{{ prescription.duration }}</td>
+                            <td class="text-muted">{{ prescription.instructions|default:"—" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="hp-card__body"><p class="text-muted mb-0">No prescriptions.</p></div>
+            {% endif %}
+        </section>
+    </div>
+
+    <aside class="hp-split__side">
+        <section class="hp-card">
+            <h2 class="mb-3">Diagnostic files</h2>
+            {% if encounter.files.all %}
+            <ul class="hp-files">
+                {% for medical_file in encounter.files.all %}
+                <li class="hp-file">
+                    <span>
+                        <span class="hp-file__name">{{ medical_file.title }}</span>
+                        <span class="hp-file__meta">{{ medical_file.get_file_type_display }}</span>
+                    </span>
+                    <a href="{% url 'download_file' medical_file.pk %}" target="_blank" rel="noopener">Open</a>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="text-muted mb-0">No files uploaded.</p>
+            {% endif %}
+        </section>
+
+        {% if is_in_visit %}
+        <section class="hp-card hp-card--dark">
+            <h2 class="mb-2">Ready to finish?</h2>
+            <p>Completing locks the record and adds it to the patient's medical history.</p>
+            <form method="post" action="{% url 'complete_encounter' encounter.pk %}"
+                  onsubmit="return confirm('Complete this encounter? It will be locked and can no longer be edited.');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-light-on-dark w-100">Complete encounter</button>
+            </form>
+            <a href="{% url 'encounter_edit' encounter.pk %}" class="btn btn-outline-light-on-dark w-100 mt-2">Edit encounter</a>
+        </section>
+        {% endif %}
+    </aside>
+</div>
 {% endblock %}

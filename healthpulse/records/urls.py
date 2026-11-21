@@ -33,10 +33,15 @@ urlpatterns = [
         name="start_visit",
     ),
     path(
-    "patients/<int:patient_id>/files/upload/",
-    views.medical_file_upload,
-    name="medical_file_upload",
-),
+        "patients/<int:patient_id>/files/upload/",
+        views.medical_file_upload,
+        name="medical_file_upload",
+    ),
+    path(
+        "my-history/",
+        views.medical_history,
+        name="medical_history",
+    ),
     path(
         "files/<int:pk>/",
         views.download_file,

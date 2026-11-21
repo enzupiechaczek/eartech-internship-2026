@@ -53,8 +53,8 @@ class Prescription(models.Model):
 class MedicalFile(models.Model):
 
     class Type(models.TextChoices):
-        XRAY = "XRAY", "X-Ray"
-        LAB_REPORT = "LAB_REPORT", "Lab Report"
+        XRAY = "XRAY", "X-ray"
+        LAB_REPORT = "LAB_REPORT", "Lab report"
         OTHER = "OTHER", "Other"
 
     patient = models.ForeignKey(

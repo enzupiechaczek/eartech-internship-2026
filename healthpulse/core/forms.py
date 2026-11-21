@@ -14,13 +14,13 @@ class RoleRegistrationForm(UserCreationForm):
     first_name = forms.CharField(
         max_length=150,
         required=True,
-        label="First Name"
+        label="First name"
     )
 
     last_name = forms.CharField(
         max_length=150,
         required=True,
-        label="Last Name"
+        label="Last name"
     )
 
     email = forms.EmailField(
@@ -32,7 +32,7 @@ class RoleRegistrationForm(UserCreationForm):
         choices=ROLE_CHOICES,
         widget=forms.RadioSelect,
         required=True,
-        label="Account Type"
+        label="Account type"
     )
 
     class Meta(UserCreationForm.Meta):

@@ -558,7 +558,7 @@ class PrescriptionTests(TestCase):
             appointment_date="2026-11-20",
             time_slot="10:00",
             reason_for_visit="General checkup",
-            status=Appointment.Status.APPROVED,
+            status=Appointment.Status.IN_VISIT,
         )
         self.encounter = ClinicalEncounter.objects.create(
             appointment=self.appointment,
@@ -674,7 +674,7 @@ class PrescriptionTests(TestCase):
             appointment_date="2026-11-21",
             time_slot="11:00",
             reason_for_visit="Follow-up",
-            status=Appointment.Status.APPROVED,
+            status=Appointment.Status.IN_VISIT,
         )
         self.client.force_login(self.doctor_user)
 
@@ -728,7 +728,7 @@ class PrescriptionTests(TestCase):
             appointment_date="2026-11-22",
             time_slot="12:00",
             reason_for_visit="Checkup",
-            status=Appointment.Status.APPROVED,
+            status=Appointment.Status.IN_VISIT,
         )
         self.client.force_login(self.doctor_user)
 
@@ -1131,7 +1131,7 @@ class PrescriptionTests(TestCase):
             appointment_date="2026-11-23",
             time_slot="11:00",
             reason_for_visit="General checkup",
-            status=Appointment.Status.APPROVED,
+            status=Appointment.Status.IN_VISIT,
         )
 
         # 2. Log in as the doctor
@@ -1255,14 +1255,14 @@ class PrescriptionTests(TestCase):
 
 
     def test_create_view_saves_medical_file_with_encounter_and_patient(self):
-        # 1. Create a new approved appointment
+        # 1. Create an in-visit appointment (visit already started)
         appointment = Appointment.objects.create(
             doctor=self.doctor,
             patient=self.patient,
             appointment_date="2026-11-24",
             time_slot="11:00",
             reason_for_visit="Diagnostic examination",
-            status=Appointment.Status.APPROVED,
+            status=Appointment.Status.IN_VISIT,
         )
 
         # 2. Create a temporary PDF file
@@ -1438,7 +1438,7 @@ class PrescriptionTests(TestCase):
             appointment_date="2026-11-24",
             time_slot="11:00",
             reason_for_visit="Medical examination",
-            status=Appointment.Status.APPROVED,
+            status=Appointment.Status.IN_VISIT,
         )
 
         uploaded_file = SimpleUploadedFile(
@@ -1571,3 +1571,302 @@ class PrescriptionTests(TestCase):
             prescription.frequency,
             original_frequency,
         )
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class VisitFlowFilesAndHistoryTests(TestCase):
+    """Start-visit gate, browser completion, protected files, medical history."""
+
+    def setUp(self):
+        self.doctor_user = User.objects.create_user(
+            username="flow-doctor", password="test123", role=User.Role.DOCTOR
+        )
+        self.other_doctor_user = User.objects.create_user(
+            username="flow-other-doctor", password="test123", role=User.Role.DOCTOR
+        )
+        self.patient_user = User.objects.create_user(
+            username="flow-patient", password="test123", role=User.Role.PATIENT
+        )
+        self.other_patient_user = User.objects.create_user(
+            username="flow-other-patient", password="test123", role=User.Role.PATIENT
+        )
+        self.doctor = DoctorProfile.objects.create(user=self.doctor_user)
+        self.other_doctor = DoctorProfile.objects.create(user=self.other_doctor_user)
+        self.patient = PatientProfile.objects.create(user=self.patient_user)
+        self.other_patient = PatientProfile.objects.create(
+            user=self.other_patient_user
+        )
+
+    def make_appointment(self, status, patient=None, doctor=None):
+        return Appointment.objects.create(
+            doctor=doctor or self.doctor,
+            patient=patient or self.patient,
+            appointment_date="2026-11-20",
+            time_slot="10:00",
+            reason_for_visit="Checkup",
+            status=status,
+        )
+
+    def make_encounter(self, appointment, diagnosis="Migraine"):
+        return ClinicalEncounter.objects.create(
+            appointment=appointment,
+            patient=appointment.patient,
+            doctor=appointment.doctor,
+            chief_complaint="Headache",
+            diagnosis=diagnosis,
+        )
+
+    def make_file(self, encounter=None, patient=None):
+        return MedicalFile.objects.create(
+            patient=patient or self.patient,
+            encounter=encounter,
+            title="Blood test",
+            file_type=MedicalFile.Type.LAB_REPORT,
+            file=SimpleUploadedFile("report.pdf", b"%PDF-1.4 data"),
+        )
+
+    # --- Start visit gate -------------------------------------------------
+
+    def test_encounter_cannot_be_created_before_visit_is_started(self):
+        appointment = self.make_appointment(Appointment.Status.APPROVED)
+        self.client.force_login(self.doctor_user)
+
+        response = self.client.get(
+            reverse("encounter_create", kwargs={"appointment_id": appointment.id})
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_start_visit_moves_to_in_visit_and_opens_encounter_form(self):
+        appointment = self.make_appointment(Appointment.Status.APPROVED)
+        self.client.force_login(self.doctor_user)
+
+        response = self.client.post(reverse("start_visit", kwargs={"pk": appointment.id}))
+
+        appointment.refresh_from_db()
+        self.assertEqual(appointment.status, Appointment.Status.IN_VISIT)
+        self.assertRedirects(
+            response,
+            reverse("encounter_create", kwargs={"appointment_id": appointment.id}),
+        )
+
+    def test_start_visit_rejects_get(self):
+        appointment = self.make_appointment(Appointment.Status.APPROVED)
+        self.client.force_login(self.doctor_user)
+
+        response = self.client.get(reverse("start_visit", kwargs={"pk": appointment.id}))
+
+        self.assertEqual(response.status_code, 405)
+
+    # --- Complete encounter from the browser ------------------------------
+
+    def test_browser_complete_redirects_to_dashboard_and_locks_encounter(self):
+        appointment = self.make_appointment(Appointment.Status.IN_VISIT)
+        encounter = self.make_encounter(appointment)
+        self.client.force_login(self.doctor_user)
+
+        response = self.client.post(
+            reverse("complete_encounter", kwargs={"encounter_id": encounter.id}),
+            HTTP_ACCEPT="text/html",
+        )
+
+        appointment.refresh_from_db()
+        self.assertRedirects(response, reverse("doctor_dashboard"))
+        self.assertEqual(appointment.status, Appointment.Status.COMPLETED)
+        detail = self.client.get(
+            reverse("encounter_detail", kwargs={"encounter_id": encounter.id})
+        )
+        self.assertNotContains(detail, "Complete encounter</button>")
+
+    def test_in_visit_encounter_detail_shows_complete_button(self):
+        encounter = self.make_encounter(
+            self.make_appointment(Appointment.Status.IN_VISIT)
+        )
+        self.client.force_login(self.doctor_user)
+
+        response = self.client.get(
+            reverse("encounter_detail", kwargs={"encounter_id": encounter.id})
+        )
+
+        self.assertContains(response, "Complete encounter</button>")
+
+    # --- Protected file view ----------------------------------------------
+
+    def test_patient_can_open_own_file(self):
+        medical_file = self.make_file()
+        self.client.force_login(self.patient_user)
+
+        response = self.client.get(reverse("download_file", kwargs={"pk": medical_file.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(b"".join(response.streaming_content), b"%PDF-1.4 data")
+        self.assertEqual(response["Cache-Control"], "private, no-store")
+
+    def test_authorized_doctor_can_open_patient_file(self):
+        self.make_appointment(Appointment.Status.APPROVED)
+        medical_file = self.make_file()
+        self.client.force_login(self.doctor_user)
+
+        response = self.client.get(reverse("download_file", kwargs={"pk": medical_file.pk}))
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_other_patient_and_unrelated_doctor_get_403(self):
+        medical_file = self.make_file()
+        url = reverse("download_file", kwargs={"pk": medical_file.pk})
+
+        for user in (self.other_patient_user, self.other_doctor_user):
+            self.client.force_login(user)
+            self.assertEqual(self.client.get(url).status_code, 403)
+
+    def test_anonymous_user_is_sent_to_login_for_file(self):
+        medical_file = self.make_file()
+        url = reverse("download_file", kwargs={"pk": medical_file.pk})
+
+        response = self.client.get(url)
+
+        self.assertRedirects(response, f"{reverse('login')}?next={url}")
+
+    # --- Patient medical chart (doctor) -----------------------------------
+
+    def test_chart_is_html_for_browsers_and_json_on_request(self):
+        self.make_encounter(self.make_appointment(Appointment.Status.IN_VISIT))
+        self.client.force_login(self.doctor_user)
+        url = reverse("patient_medical_chart", kwargs={"patient_id": self.patient.id})
+
+        html = self.client.get(url)
+        data = self.client.get(url, {"format": "json"}).json()
+
+        self.assertTemplateUsed(html, "records/patient_chart.html")
+        self.assertEqual(data["encounters"][0]["diagnosis"], "Migraine")
+
+    # --- Medical history timeline (patient) -------------------------------
+
+    def test_history_shows_only_own_completed_visits_newest_first(self):
+        old = self.make_encounter(
+            self.make_appointment(Appointment.Status.COMPLETED), diagnosis="Old flu"
+        )
+        new = self.make_encounter(
+            self.make_appointment(Appointment.Status.COMPLETED, doctor=self.other_doctor),
+            diagnosis="Sprained ankle",
+        )
+        self.make_encounter(
+            self.make_appointment(Appointment.Status.IN_VISIT), diagnosis="Draft visit"
+        )
+        self.make_encounter(
+            self.make_appointment(Appointment.Status.COMPLETED, patient=self.other_patient),
+            diagnosis="Someone else",
+        )
+        Prescription.objects.create(
+            encounter=new, medication_name="Ibuprofen", dosage="400mg",
+            frequency="3x daily", duration="5 days",
+        )
+        attached = self.make_file(encounter=new)
+        self.client.force_login(self.patient_user)
+
+        response = self.client.get(reverse("medical_history"))
+
+        self.assertEqual(list(response.context["encounters"]), [new, old])
+        self.assertContains(response, "Ibuprofen")
+        self.assertContains(response, reverse("download_file", kwargs={"pk": attached.pk}))
+        self.assertNotContains(response, "Draft visit")
+        self.assertNotContains(response, "Someone else")
+
+    def test_history_lists_files_uploaded_outside_a_visit(self):
+        loose = self.make_file()
+        self.client.force_login(self.patient_user)
+
+        response = self.client.get(reverse("medical_history"))
+
+        self.assertEqual(list(response.context["other_files"]), [loose])
+
+    def test_doctor_cannot_open_patient_history_page(self):
+        self.client.force_login(self.doctor_user)
+
+        response = self.client.get(reverse("medical_history"))
+
+        self.assertRedirects(response, reverse("doctor_dashboard"))
+
+    # --- QA regressions ---------------------------------------------------
+
+    def test_login_returns_to_next_url(self):
+        medical_file = self.make_file()
+        url = reverse("download_file", kwargs={"pk": medical_file.pk})
+
+        response = self.client.post(
+            f"{reverse('login')}?next={url}",
+            {"username": "flow-patient", "password": "test123"},
+        )
+
+        self.assertRedirects(response, url, fetch_redirect_response=False)
+
+    def test_login_ignores_offsite_next_url(self):
+        response = self.client.post(
+            f"{reverse('login')}?next=https://evil.example.com/",
+            {"username": "flow-patient", "password": "test123"},
+        )
+
+        self.assertRedirects(
+            response, reverse("home_redirect"), fetch_redirect_response=False
+        )
+
+    def test_edit_form_links_existing_file_via_protected_view_not_media(self):
+        encounter = self.make_encounter(
+            self.make_appointment(Appointment.Status.IN_VISIT)
+        )
+        medical_file = self.make_file(encounter=encounter)
+        self.client.force_login(self.doctor_user)
+
+        response = self.client.get(
+            reverse("encounter_edit", kwargs={"encounter_id": encounter.id})
+        )
+
+        self.assertContains(response, reverse("download_file", kwargs={"pk": medical_file.pk}))
+        self.assertNotContains(response, "/media/")
+
+    def test_permission_denied_uses_friendly_403_page(self):
+        encounter = self.make_encounter(
+            self.make_appointment(Appointment.Status.COMPLETED)
+        )
+        self.client.force_login(self.doctor_user)
+
+        response = self.client.get(
+            reverse("encounter_edit", kwargs={"encounter_id": encounter.id})
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertTemplateUsed(response, "403.html")
+        self.assertContains(response, "Completed encounters cannot be edited.", status_code=403)
+
+    # --- QA round 2 -------------------------------------------------------
+
+    def test_login_error_is_shown_once(self):
+        response = self.client.post(
+            reverse("login"), {"username": "flow-patient", "password": "wrong"}
+        )
+
+        self.assertEqual(response.content.decode().count("Please enter a correct"), 1)
+
+    def test_future_visit_cannot_be_started_early(self):
+        from datetime import timedelta
+        from django.utils import timezone
+
+        appointment = self.make_appointment(Appointment.Status.APPROVED)
+        appointment.appointment_date = timezone.localdate() + timedelta(days=3)
+        appointment.save()
+        self.client.force_login(self.doctor_user)
+
+        response = self.client.post(reverse("start_visit", kwargs={"pk": appointment.id}))
+
+        appointment.refresh_from_db()
+        self.assertRedirects(response, reverse("doctor_dashboard"), fetch_redirect_response=False)
+        self.assertEqual(appointment.status, Appointment.Status.APPROVED)
+
+    def test_history_and_detail_show_the_appointment_date(self):
+        appointment = self.make_appointment(Appointment.Status.COMPLETED)  # 2026-11-20
+        self.make_encounter(appointment)
+        self.client.force_login(self.patient_user)
+
+        response = self.client.get(reverse("medical_history"))
+
+        self.assertContains(response, "20 Nov 2026")
