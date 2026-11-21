@@ -1,4 +1,3 @@
-
 from django.urls import path
 from . import views
 
@@ -32,5 +31,15 @@ urlpatterns = [
         "appointments/<int:pk>/start/",
         views.start_visit,
         name="start_visit",
+    ),
+    path(
+    "patients/<int:patient_id>/files/upload/",
+    views.medical_file_upload,
+    name="medical_file_upload",
+),
+    path(
+        "files/<int:pk>/",
+        views.download_file,
+        name="download_file",
     ),
 ]

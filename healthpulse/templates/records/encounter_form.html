@@ -3,7 +3,7 @@
 {% block content %}
 <h1>{% if encounter.pk %}Edit{% else %}Create{% endif %} Encounter</h1>
 
-<form method="post">
+<form method="post" enctype="multipart/form-data">
     {% csrf_token %}
 
     {% if form.non_field_errors %}
@@ -46,6 +46,43 @@
     <button type="button" id="add-prescription" class="btn btn-outline-secondary mb-3">
         Add prescription
     </button>
+
+    <hr>
+
+    <h2>Diagnostic Files</h2>
+
+    {{ file_formset.management_form }}
+
+    {% if file_formset.non_form_errors %}
+        <div class="text-danger">
+            {{ file_formset.non_form_errors }}
+        </div>
+    {% endif %}
+
+    <div id="medical-file-forms">
+        {% for file_form in file_formset %}
+            <div class="medical-file-form border rounded p-3 mb-3">
+
+                {% for hidden in file_form.hidden_fields %}
+                    {{ hidden }}
+                {% endfor %}
+
+                {% for field in file_form.visible_fields %}
+                    <div class="mb-2">
+                        {{ field.label_tag }}
+                        {{ field }}
+
+                        {% if field.errors %}
+                            <div class="text-danger">
+                                {{ field.errors }}
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+
+            </div>
+        {% endfor %}
+    </div>
 
     <div>
         <button type="submit" class="btn btn-primary">Save Encounter</button>

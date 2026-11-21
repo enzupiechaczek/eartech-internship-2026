@@ -1,7 +1,9 @@
+
 from django import forms
 from django.forms import inlineformset_factory
+from django.forms.models import BaseInlineFormSet
 
-from .models import ClinicalEncounter, Prescription
+from .models import ClinicalEncounter, Prescription, MedicalFile
 
 
 class ClinicalEncounterForm(forms.ModelForm):
@@ -27,5 +29,33 @@ PrescriptionFormSet = inlineformset_factory(
     can_delete=True,
 )
 
-# Descriptive alias for callers that prefer an explicit inline formset name.
 PrescriptionInlineFormSet = PrescriptionFormSet
+
+
+class MedicalFileForm(forms.ModelForm):
+    class Meta:
+        model = MedicalFile
+        fields = ["title", "file_type", "file"]
+
+
+class BaseMedicalFileFormSet(BaseInlineFormSet):
+    def save_new(self, form, commit=True):
+        medical_file = super().save_new(form, commit=False)
+
+        medical_file.patient = self.instance.patient
+
+        if commit:
+            medical_file.save()
+
+        return medical_file
+
+
+MedicalFileFormSet = inlineformset_factory(
+    ClinicalEncounter,
+    MedicalFile,
+    form=MedicalFileForm,
+    formset=BaseMedicalFileFormSet,
+    fields=["title", "file_type", "file"],
+    extra=1,
+    can_delete=True,
+)

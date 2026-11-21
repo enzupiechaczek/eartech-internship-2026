@@ -1,17 +1,25 @@
-
+import os
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
+from django.http import JsonResponse, FileResponse, Http404
 from django.core.exceptions import PermissionDenied
 from django.views.decorators.http import require_POST
-
 from appointments.models import Appointment
 from core.decorators import doctor_required
 from core.models import PatientProfile
-from .forms import ClinicalEncounterForm, PrescriptionFormSet
-from .models import ClinicalEncounter
-from .permissions import AUTH_STATUSES, require_relationship
+from .forms import (
+    ClinicalEncounterForm,
+    PrescriptionFormSet,
+    MedicalFileForm,
+    MedicalFileFormSet,
+)
+from .models import ClinicalEncounter, MedicalFile
+from .permissions import (
+    AUTH_STATUSES,
+    has_relationship,
+    require_relationship,
+)
 
 
 @login_required
@@ -134,6 +142,7 @@ def complete_encounter(request, encounter_id):
     })
 
 
+
 @doctor_required
 def encounter_create(request, appointment_id):
     appointment = get_object_or_404(
@@ -168,12 +177,23 @@ def encounter_create(request, appointment_id):
 
     if request.method == "POST":
         form = ClinicalEncounterForm(request.POST)
+
         formset = PrescriptionFormSet(
             request.POST,
             instance=encounter
         )
 
-        if form.is_valid() and formset.is_valid():
+        file_formset = MedicalFileFormSet(
+            request.POST,
+            request.FILES,
+            instance=encounter
+        )
+
+        if (
+            form.is_valid()
+            and formset.is_valid()
+            and file_formset.is_valid()
+        ):
             with transaction.atomic():
                 encounter = form.save(commit=False)
                 encounter.appointment = appointment
@@ -182,7 +202,10 @@ def encounter_create(request, appointment_id):
                 encounter.save()
 
                 formset.instance = encounter
+                file_formset.instance = encounter
+
                 formset.save()
+                file_formset.save()
 
             return redirect(
                 "encounter_detail",
@@ -192,11 +215,17 @@ def encounter_create(request, appointment_id):
     else:
         form = ClinicalEncounterForm()
         formset = PrescriptionFormSet(instance=encounter)
+        file_formset = MedicalFileFormSet(instance=encounter)
 
     return render(
         request,
         "records/encounter_form.html",
-        {"form": form, "formset": formset, "encounter": encounter},
+        {
+            "form": form,
+            "formset": formset,
+            "file_formset": file_formset,
+            "encounter": encounter,
+        },
     )
 
 
@@ -208,6 +237,7 @@ def encounter_edit(request, encounter_id):
         doctor=request.user.doctorprofile,
     )
 
+    # Prevent editing completed encounters
     if encounter.appointment.status == Appointment.Status.COMPLETED:
         raise PermissionDenied(
             "Completed encounters cannot be edited."
@@ -218,22 +248,37 @@ def encounter_edit(request, encounter_id):
             "Encounter editing requires an approved or active appointment."
         )
 
-    require_relationship(request.user.doctorprofile, encounter.patient)
+    require_relationship(
+        request.user.doctorprofile,
+        encounter.patient
+    )
 
     if request.method == "POST":
         form = ClinicalEncounterForm(
             request.POST,
             instance=encounter
         )
+
         formset = PrescriptionFormSet(
             request.POST,
             instance=encounter
         )
 
-        if form.is_valid() and formset.is_valid():
+        file_formset = MedicalFileFormSet(
+            request.POST,
+            request.FILES,
+            instance=encounter
+        )
+
+        if (
+            form.is_valid()
+            and formset.is_valid()
+            and file_formset.is_valid()
+        ):
             with transaction.atomic():
                 form.save()
                 formset.save()
+                file_formset.save()
 
             return redirect(
                 "encounter_detail",
@@ -243,13 +288,18 @@ def encounter_edit(request, encounter_id):
     else:
         form = ClinicalEncounterForm(instance=encounter)
         formset = PrescriptionFormSet(instance=encounter)
+        file_formset = MedicalFileFormSet(instance=encounter)
 
     return render(
         request,
         "records/encounter_form.html",
-        {"form": form, "formset": formset, "encounter": encounter},
+        {
+            "form": form,
+            "formset": formset,
+            "file_formset": file_formset,
+            "encounter": encounter,
+        },
     )
-
 
 @doctor_required
 def start_visit(request, pk):
@@ -278,4 +328,77 @@ def start_visit(request, pk):
     return redirect(
         "encounter_create",
         appointment_id=appointment.pk,
+    )
+
+@login_required
+def download_file(request, pk):
+    medical_file = get_object_or_404(MedicalFile, pk=pk)
+
+    patient = (
+        getattr(medical_file, "patient", None)
+        or getattr(
+            getattr(medical_file, "encounter", None),
+            "patient",
+            None,
+        )
+    )
+
+    patient_profile = getattr(request.user, "patientprofile", None)
+    doctor_profile = getattr(request.user, "doctorprofile", None)
+
+    is_owner = (
+        patient_profile is not None
+        and patient_profile == patient
+    )
+
+    is_authorized_doctor = (
+        doctor_profile is not None
+        and patient is not None
+        and has_relationship(doctor_profile, patient)
+    )
+
+    if not (is_owner or is_authorized_doctor):
+        raise PermissionDenied(
+            "You do not have permission to access this medical file."
+        )
+
+    if not medical_file.file or not os.path.exists(medical_file.file.path):
+        raise Http404("Requested file not found.")
+
+    return FileResponse(
+        medical_file.file.open("rb"),
+        as_attachment=False,
+        filename=os.path.basename(medical_file.file.name),
+    )
+
+
+@doctor_required
+def medical_file_upload(request, patient_id):
+    patient = get_object_or_404(
+        PatientProfile,
+        id=patient_id,
+    )
+
+    require_relationship(request.user.doctorprofile, patient)
+
+    if request.method == "POST":
+        form = MedicalFileForm(request.POST, request.FILES)
+
+        if form.is_valid():
+            medical_file = form.save(commit=False)
+            medical_file.patient = patient
+            medical_file.save()
+
+            return redirect(
+                "patient_medical_chart",
+                patient_id=patient.id,
+            )
+
+    else:
+        form = MedicalFileForm()
+
+    return render(
+        request,
+        "records/medical_file_upload.html",
+        {"form": form, "patient": patient},
     )

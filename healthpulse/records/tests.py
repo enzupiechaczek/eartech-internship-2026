@@ -1,4 +1,4 @@
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
 from django.urls import reverse
@@ -6,8 +6,10 @@ from unittest.mock import patch
 from core.models import DoctorProfile, PatientProfile
 from appointments.models import Appointment
 from .forms import ClinicalEncounterForm, PrescriptionFormSet
-from .models import ClinicalEncounter, Prescription
+from .models import ClinicalEncounter, Prescription, MedicalFile
 from .permissions import has_relationship, require_relationship
+import tempfile
+from django.core.files.uploadedfile import SimpleUploadedFile
 
 
 User = get_user_model()
@@ -698,7 +700,14 @@ class PrescriptionTests(TestCase):
                 "prescriptions-1-dosage": "20mg",
                 "prescriptions-1-frequency": "Nightly",
                 "prescriptions-1-duration": "90 days",
-                "prescriptions-1-instructions": "Take after dinner",
+                "prescriptions-1-instructions": "Take after dinner","files-TOTAL_FORMS": "1",
+
+
+               "files-TOTAL_FORMS": "1",
+               "files-INITIAL_FORMS": "0",
+               "files-MIN_NUM_FORMS": "0",
+               "files-MAX_NUM_FORMS": "1000",
+
             },
         )
 
@@ -740,6 +749,11 @@ class PrescriptionTests(TestCase):
                 "prescriptions-0-dosage": "",
                 "prescriptions-0-frequency": "Once daily",
                 "prescriptions-0-duration": "30 days",
+
+                "files-TOTAL_FORMS": "1",
+               "files-INITIAL_FORMS": "0",
+               "files-MIN_NUM_FORMS": "0",
+               "files-MAX_NUM_FORMS": "1000",
             },
         )
 
@@ -782,6 +796,11 @@ class PrescriptionTests(TestCase):
                 "prescriptions-1-frequency": "Nightly",
                 "prescriptions-1-duration": "90 days",
                 "prescriptions-1-instructions": "Take after dinner",
+
+                "files-TOTAL_FORMS": "1",
+               "files-INITIAL_FORMS": "0",
+               "files-MIN_NUM_FORMS": "0",
+               "files-MAX_NUM_FORMS": "1000",
             },
         )
 
@@ -828,6 +847,11 @@ class PrescriptionTests(TestCase):
                 "prescriptions-0-duration": "30 days",
                 "prescriptions-0-instructions": "",
                 "prescriptions-0-DELETE": "on",
+
+                "files-TOTAL_FORMS": "1",
+               "files-INITIAL_FORMS": "0",
+               "files-MIN_NUM_FORMS": "0",
+               "files-MAX_NUM_FORMS": "1000",
             },
         )
 
@@ -853,6 +877,11 @@ class PrescriptionTests(TestCase):
                 "prescriptions-1-frequency": "",
                 "prescriptions-1-duration": "",
                 "prescriptions-1-instructions": "",
+
+                "files-TOTAL_FORMS": "1",
+                "files-INITIAL_FORMS": "0",
+                "files-MIN_NUM_FORMS": "0",
+                "files-MAX_NUM_FORMS": "1000",
             },
             instance=self.encounter,
         )
@@ -1013,6 +1042,11 @@ class PrescriptionTests(TestCase):
                 "prescriptions-0-frequency": "Once daily",
                 "prescriptions-0-duration": "5 days",
                 "prescriptions-0-instructions": "",
+
+                "files-TOTAL_FORMS": "1",
+                "files-INITIAL_FORMS": "0",
+                "files-MIN_NUM_FORMS": "0",
+                "files-MAX_NUM_FORMS": "1000",
             },
         )
 
@@ -1065,6 +1099,11 @@ class PrescriptionTests(TestCase):
                 "prescriptions-0-duration": "30 days",
                 "prescriptions-0-instructions": "",
                 "prescriptions-0-DELETE": "on",
+
+                "files-TOTAL_FORMS": "1",
+                "files-INITIAL_FORMS": "0",
+                "files-MIN_NUM_FORMS": "0",
+                "files-MAX_NUM_FORMS": "1000",
             },
         )
 
@@ -1122,6 +1161,11 @@ class PrescriptionTests(TestCase):
                 "prescriptions-0-frequency": "Once daily",
                 "prescriptions-0-duration": "30 days",
                 "prescriptions-0-instructions": "",
+
+                "files-TOTAL_FORMS": "1",
+                "files-INITIAL_FORMS": "0",
+                "files-MIN_NUM_FORMS": "0",
+                "files-MAX_NUM_FORMS": "1000",
             },
         )
 
@@ -1185,6 +1229,11 @@ class PrescriptionTests(TestCase):
                     "prescriptions-0-frequency": "Twice daily",
                     "prescriptions-0-duration": "30 days",
                     "prescriptions-0-instructions": "",
+
+                    "files-TOTAL_FORMS": "1",
+                    "files-INITIAL_FORMS": "0",
+                    "files-MIN_NUM_FORMS": "0",
+                    "files-MAX_NUM_FORMS": "1000",
                 },
             )
 
@@ -1205,3 +1254,320 @@ class PrescriptionTests(TestCase):
 
 
 
+    def test_create_view_saves_medical_file_with_encounter_and_patient(self):
+        # 1. Create a new approved appointment
+        appointment = Appointment.objects.create(
+            doctor=self.doctor,
+            patient=self.patient,
+            appointment_date="2026-11-24",
+            time_slot="11:00",
+            reason_for_visit="Diagnostic examination",
+            status=Appointment.Status.APPROVED,
+        )
+
+        # 2. Create a temporary PDF file
+        file_content = b"%PDF-1.4\nTest diagnostic report\n"
+
+        uploaded_file = SimpleUploadedFile(
+            "lab-report.pdf",
+            file_content,
+            content_type="application/pdf",
+        )
+
+        # 3. Log in as the doctor
+        self.client.force_login(self.doctor_user)
+
+        # 4. Use temporary storage for uploaded files
+        with tempfile.TemporaryDirectory() as media_root:
+            with override_settings(MEDIA_ROOT=media_root):
+
+                # 5. Submit encounter, prescriptions and file
+                response = self.client.post(
+                    reverse(
+                        "encounter_create",
+                        kwargs={"appointment_id": appointment.id},
+                    ),
+                    {
+                        "chief_complaint": "Headache",
+                        "diagnosis": "Migraine",
+                        "treatment_notes": "Rest",
+
+                        "prescriptions-TOTAL_FORMS": "2",
+                        "prescriptions-INITIAL_FORMS": "0",
+                        "prescriptions-MIN_NUM_FORMS": "0",
+                        "prescriptions-MAX_NUM_FORMS": "1000",
+
+                        "files-TOTAL_FORMS": "1",
+                        "files-INITIAL_FORMS": "0",
+                        "files-MIN_NUM_FORMS": "0",
+                        "files-MAX_NUM_FORMS": "1000",
+
+                        "files-0-title": "Blood Test Report",
+                        "files-0-file_type": "LAB_REPORT",
+                        "files-0-file": uploaded_file,
+                    },
+                )
+
+                # 6. Check successful creation
+                self.assertEqual(response.status_code, 302)
+
+                # 7. Retrieve the created encounter
+                encounter = ClinicalEncounter.objects.get(
+                    appointment=appointment
+                )
+
+                # 8. Retrieve the uploaded medical file
+                medical_file = MedicalFile.objects.get(
+                    encounter=encounter
+                )
+
+                # 9. Check patient and encounter relationships
+                self.assertEqual(
+                    medical_file.patient,
+                    self.patient,
+                )
+                self.assertEqual(
+                    medical_file.encounter,
+                    encounter,
+                )
+
+                # 10. Check that the file was stored correctly
+                with medical_file.file.open("rb") as saved_file:
+                    self.assertEqual(
+                        saved_file.read(),
+                        file_content,
+                    )
+
+
+    def test_completed_encounter_cannot_delete_medical_file(self):
+        # 1. Create an existing medical file
+        medical_file = MedicalFile.objects.create(
+            patient=self.patient,
+            encounter=self.encounter,
+            title="Blood Test Report",
+            file_type=MedicalFile.Type.LAB_REPORT,
+            file="medical/test-report.pdf",
+        )
+
+        # 2. Complete the appointment
+        self.appointment.status = Appointment.Status.COMPLETED
+        self.appointment.save(update_fields=["status"])
+
+        # 3. Log in as the doctor
+        self.client.force_login(self.doctor_user)
+
+        # 4. Try to delete the medical file through encounter edit
+        response = self.client.post(
+            reverse(
+                "encounter_edit",
+                kwargs={"encounter_id": self.encounter.id},
+            ),
+            {},
+        )
+
+        # 5. Check that editing is forbidden
+        self.assertEqual(response.status_code, 403)
+
+        # 6. Make sure the medical file still exists
+        self.assertTrue(
+            MedicalFile.objects.filter(pk=medical_file.pk).exists()
+        )
+
+    def test_completed_encounter_cannot_add_medical_file(self):
+        # 1. Complete the appointment
+        self.appointment.status = Appointment.Status.COMPLETED
+        self.appointment.save(update_fields=["status"])
+
+        # 2. Create a test PDF file
+        uploaded_file = SimpleUploadedFile(
+            "new-report.pdf",
+            b"%PDF-1.4\nTest report",
+            content_type="application/pdf",
+        )
+
+        # 3. Log in as the doctor
+        self.client.force_login(self.doctor_user)
+
+        # 4. Try to add a medical file to the completed encounter
+        response = self.client.post(
+            reverse(
+                "encounter_edit",
+                kwargs={"encounter_id": self.encounter.id},
+            ),
+            {
+                "chief_complaint": "Headache",
+                "diagnosis": "Migraine",
+                "treatment_notes": "Rest",
+
+                "prescriptions-TOTAL_FORMS": "2",
+                "prescriptions-INITIAL_FORMS": "0",
+                "prescriptions-MIN_NUM_FORMS": "0",
+                "prescriptions-MAX_NUM_FORMS": "1000",
+
+                "files-TOTAL_FORMS": "1",
+                "files-INITIAL_FORMS": "0",
+                "files-MIN_NUM_FORMS": "0",
+                "files-MAX_NUM_FORMS": "1000",
+
+                "files-0-title": "New Lab Report",
+                "files-0-file_type": "LAB_REPORT",
+                "files-0-file": uploaded_file,
+            },
+        )
+
+        # 5. Check that the request is forbidden
+        self.assertEqual(response.status_code, 403)
+
+        # 6. Make sure no file was added
+        self.assertFalse(
+            MedicalFile.objects.filter(
+                encounter=self.encounter
+            ).exists()
+        )
+
+    @patch(
+        "records.views.MedicalFileFormSet.save",
+        side_effect=RuntimeError("Simulated medical file save failure"),
+    )
+    def test_create_view_rolls_back_when_medical_file_save_fails(
+        self, mock_save
+    ):
+        appointment = Appointment.objects.create(
+            doctor=self.doctor,
+            patient=self.patient,
+            appointment_date="2026-11-24",
+            time_slot="11:00",
+            reason_for_visit="Medical examination",
+            status=Appointment.Status.APPROVED,
+        )
+
+        uploaded_file = SimpleUploadedFile(
+            "lab-report.pdf",
+            b"%PDF-1.4\nTest report",
+            content_type="application/pdf",
+        )
+
+        self.client.force_login(self.doctor_user)
+        self.client.raise_request_exception = False
+
+        response = self.client.post(
+            reverse(
+                "encounter_create",
+                kwargs={"appointment_id": appointment.id},
+            ),
+            {
+                "chief_complaint": "Headache",
+                "diagnosis": "Migraine",
+                "treatment_notes": "Rest",
+
+                "prescriptions-TOTAL_FORMS": "2",
+                "prescriptions-INITIAL_FORMS": "0",
+                "prescriptions-MIN_NUM_FORMS": "0",
+                "prescriptions-MAX_NUM_FORMS": "1000",
+
+                "prescriptions-0-medication_name": "Aspirin",
+                "prescriptions-0-dosage": "81mg",
+                "prescriptions-0-frequency": "Once daily",
+                "prescriptions-0-duration": "30 days",
+                "prescriptions-0-instructions": "",
+
+                "files-TOTAL_FORMS": "1",
+                "files-INITIAL_FORMS": "0",
+                "files-MIN_NUM_FORMS": "0",
+                "files-MAX_NUM_FORMS": "1000",
+
+                "files-0-title": "Blood Test",
+                "files-0-file_type": "LAB_REPORT",
+                "files-0-file": uploaded_file,
+            },
+        )
+
+        self.assertEqual(response.status_code, 500)
+        mock_save.assert_called_once()
+
+        self.assertFalse(
+            ClinicalEncounter.objects.filter(
+                appointment=appointment
+            ).exists()
+        )
+
+        self.assertFalse(
+            MedicalFile.objects.filter(
+                patient=self.patient,
+                title="Blood Test",
+            ).exists()
+        )
+        self.assertFalse(Prescription.objects.exists())
+
+
+    @patch(
+        "records.views.MedicalFileFormSet.save",
+        side_effect=RuntimeError("Simulated medical file save failure"),
+    )
+    def test_edit_view_rolls_back_when_medical_file_save_fails(
+        self, mock_save
+    ):
+        # 1. Create an existing prescription
+        prescription = Prescription.objects.create(
+            encounter=self.encounter,
+            medication_name="Aspirin",
+            dosage="81mg",
+            frequency="Once daily",
+            duration="30 days",
+        )
+
+        # 2. Save original values
+        original_diagnosis = self.encounter.diagnosis
+        original_frequency = prescription.frequency
+
+        # 3. Log in as the doctor
+        self.client.force_login(self.doctor_user)
+        self.client.raise_request_exception = False
+
+        # 4. Submit updated encounter and prescription data
+        response = self.client.post(
+            reverse(
+                "encounter_edit",
+                kwargs={"encounter_id": self.encounter.id},
+            ),
+            {
+                "chief_complaint": "Headache",
+                "diagnosis": "Updated diagnosis",
+                "treatment_notes": "Updated notes",
+
+                "prescriptions-TOTAL_FORMS": "1",
+                "prescriptions-INITIAL_FORMS": "1",
+                "prescriptions-MIN_NUM_FORMS": "0",
+                "prescriptions-MAX_NUM_FORMS": "1000",
+
+                "prescriptions-0-id": str(prescription.id),
+                "prescriptions-0-medication_name": "Aspirin",
+                "prescriptions-0-dosage": "81mg",
+                "prescriptions-0-frequency": "Twice daily",
+                "prescriptions-0-duration": "30 days",
+                "prescriptions-0-instructions": "",
+
+                "files-TOTAL_FORMS": "1",
+                "files-INITIAL_FORMS": "0",
+                "files-MIN_NUM_FORMS": "0",
+                "files-MAX_NUM_FORMS": "1000",
+            },
+        )
+
+        # 5. Verify the simulated failure
+        self.assertEqual(response.status_code, 500)
+        mock_save.assert_called_once()
+
+        # 6. Reload the original records
+        self.encounter.refresh_from_db()
+        prescription.refresh_from_db()
+
+        # 7. Verify that all changes were rolled back
+        self.assertEqual(
+            self.encounter.diagnosis,
+            original_diagnosis,
+        )
+        self.assertEqual(
+            prescription.frequency,
+            original_frequency,
+        )
