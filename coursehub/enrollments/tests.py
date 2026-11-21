@@ -5,7 +5,7 @@ from django.db import IntegrityError
 from django.test import TestCase
 from django.urls import reverse
 
-from courses.models import Course, Lesson, Module
+from courses.models import Course, Lesson, LessonProgress, Module
 from enrollments.models import Enrollment
 
 User = get_user_model()
@@ -226,7 +226,6 @@ class StudentDashboardTests(TestCase):
             description="Learn advanced Django.",
             instructor=self.instructor,
         )
-
         own_enrollment = Enrollment.objects.create(
             student=self.student,
             course=self.course,
@@ -235,13 +234,11 @@ class StudentDashboardTests(TestCase):
             student=self.other_student,
             course=other_course,
         )
-
         self.client.force_login(self.student)
 
         response = self.client.get(
             reverse("enrollments:student_dashboard")
         )
-
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["enrollments"].count(), 1)
         self.assertEqual(
@@ -265,6 +262,194 @@ class StudentDashboardTests(TestCase):
         enrollment = response.context["enrollments"].first()
         self.assertEqual(enrollment.completed_lessons, 0)
         self.assertEqual(enrollment.progress_percentage, 0)
+
+    def test_dashboard_shows_start_course_when_progress_is_zero(self):
+        Enrollment.objects.create(
+            student=self.student,
+            course=self.course,
+        )
+        self.client.force_login(self.student)
+
+        response = self.client.get(
+            reverse("enrollments:student_dashboard")
+        )
+        self.assertContains(response, "Start Course")
+
+    def test_dashboard_shows_continue_when_progress_is_greater_than_zero(self):
+        module = Module.objects.create(
+            course=self.course,
+            title="Module 1",
+        )
+        lesson1 = Lesson.objects.create(
+            module=module,
+            title="Lesson 1",
+        )
+        Lesson.objects.create(
+            module=module,
+            title="Lesson 2",
+        )
+        Enrollment.objects.create(
+            student=self.student,
+            course=self.course,
+        )
+        LessonProgress.objects.create(
+            student=self.student,
+            lesson=lesson1,
+        )
+        self.client.force_login(self.student)
+
+        response = self.client.get(
+            reverse("enrollments:student_dashboard")
+        )
+        self.assertRegex(
+            response.content.decode(),
+            r'<a[^>]*class="btn btn-primary w-100"[^>]*>\s*Continue\s*</a>',
+        )
+        self.assertNotContains(response, "Start Course")
+
+    def test_dashboard_progress_is_isolated_between_students(self):
+        module = Module.objects.create(
+            course=self.course,
+            title="Module 1",
+        )
+        lesson1 = Lesson.objects.create(
+            module=module,
+            title="Lesson 1",
+        )
+        Lesson.objects.create(
+            module=module,
+            title="Lesson 2",
+        )
+        Enrollment.objects.create(
+            student=self.student,
+            course=self.course,
+        )
+        Enrollment.objects.create(
+            student=self.other_student,
+            course=self.course,
+        )
+        LessonProgress.objects.create(
+            student=self.other_student,
+            lesson=lesson1,
+        )
+        self.client.force_login(self.student)
+
+        response = self.client.get(
+            reverse("enrollments:student_dashboard")
+        )
+        self.assertContains(response, "Start Course")
+
+    def test_progress_updates_when_student_completes_lesson(self):
+        module = Module.objects.create(
+            course=self.course,
+            title="Module 1",
+        )
+        lesson1 = Lesson.objects.create(
+            module=module,
+            title="Lesson 1",
+        )
+        Lesson.objects.create(
+            module=module,
+            title="Lesson 2",
+        )
+        enrollment = Enrollment.objects.create(
+            student=self.student,
+            course=self.course,
+        )
+        LessonProgress.objects.create(
+            student=self.student,
+            lesson=lesson1,
+        )
+
+        self.assertEqual(enrollment.completed_lessons, 1)
+        self.assertEqual(enrollment.progress_percentage, 50)
+
+    def test_progress_is_isolated_between_students(self):
+        module = Module.objects.create(
+            course=self.course,
+            title="Module 1",
+        )
+        lesson1 = Lesson.objects.create(
+            module=module,
+            title="Lesson 1",
+        )
+        Lesson.objects.create(
+            module=module,
+            title="Lesson 2",
+        )
+
+        enrollment1 = Enrollment.objects.create(
+            student=self.student,
+            course=self.course,
+        )
+        enrollment2 = Enrollment.objects.create(
+            student=self.other_student,
+            course=self.course,
+        )
+        LessonProgress.objects.create(
+            student=self.student,
+            lesson=lesson1,
+        )
+
+        self.assertEqual(enrollment1.completed_lessons, 1)
+        self.assertEqual(enrollment1.progress_percentage, 50)
+
+        self.assertEqual(enrollment2.completed_lessons, 0)
+        self.assertEqual(enrollment2.progress_percentage, 0)
+
+
+    def test_progress_is_isolated_between_courses(self):
+        module1 = Module.objects.create(
+            course=self.course,
+            title="Module 1",
+        )
+        lesson1 = Lesson.objects.create(
+            module=module1,
+            title="Lesson 1",
+        )
+        Lesson.objects.create(
+            module=module1,
+            title="Lesson 2",
+        )
+
+        other_course = Course.objects.create(
+            title="Java Course",
+            description="Learn Java.",
+            instructor=self.instructor,
+        )
+
+        module2 = Module.objects.create(
+            course=other_course,
+            title="Module 2",
+        )
+        Lesson.objects.create(
+            module=module2,
+            title="Lesson 3",
+        )
+        Lesson.objects.create(
+            module=module2,
+            title="Lesson 4",
+        )
+
+        enrollment1 = Enrollment.objects.create(
+            student=self.student,
+            course=self.course,
+        )
+        enrollment2 = Enrollment.objects.create(
+            student=self.student,
+            course=other_course,
+        )
+
+        LessonProgress.objects.create(
+            student=self.student,
+            lesson=lesson1,
+        )
+
+        self.assertEqual(enrollment1.completed_lessons, 1)
+        self.assertEqual(enrollment1.progress_percentage, 50)
+
+        self.assertEqual(enrollment2.completed_lessons, 0)
+        self.assertEqual(enrollment2.progress_percentage, 0)
 
     def test_student_can_open_own_enrollment(self):
         module = Module.objects.create(

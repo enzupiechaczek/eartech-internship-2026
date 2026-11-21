@@ -74,7 +74,11 @@
                         href="{% url 'enrollments:course_detail' enrollment.pk %}"
                         class="btn btn-primary w-100"
                     >
-                        Start Course
+                        {% if enrollment.completed_lessons > 0 %}
+                            Continue
+                        {% else %}
+                            Start Course
+                        {% endif %}
                     </a>
 
                 </div>
