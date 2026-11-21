@@ -26,6 +26,11 @@ class BookingForm(forms.ModelForm):
             ),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Block past dates in the picker too, not only after submitting.
+        self.fields["appointment_date"].widget.attrs["min"] = date.today().isoformat()
+
     def clean_appointment_date(self):
         appointment_date = self.cleaned_data["appointment_date"]
 
