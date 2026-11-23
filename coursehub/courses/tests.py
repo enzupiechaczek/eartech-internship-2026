@@ -16,7 +16,7 @@ from PIL import Image
 from enrollments.models import Enrollment
 
 from .forms import CourseForm, MAX_THUMBNAIL_SIZE, validate_thumbnail_size
-from .models import Category, Course, Module, Lesson, embed_url
+from .models import Category, Course, Module, Lesson, embed_url, LessonProgress
 
 TEMP_MEDIA_ROOT = tempfile.mkdtemp()
 
@@ -25,6 +25,142 @@ def make_image(name="thumb.png", fmt="PNG"):
     buffer = io.BytesIO()
     Image.new("RGB", (10, 10), "blue").save(buffer, fmt)
     return SimpleUploadedFile(name, buffer.getvalue(), content_type=f"image/{fmt.lower()}")
+
+
+class LessonProgressTests(TestCase):
+    def setUp(self):
+        self.User = get_user_model()
+        self.user = self.User.objects.create_user(username='student', password='pass')
+        self.instructor = self.User.objects.create_user(username='instructor', password='pass')
+
+        self.course = Course.objects.create(
+            title='Test Course',
+            description='Test Description',
+            instructor=self.instructor,
+            status=Course.Status.PUBLISHED
+        )
+
+        self.module = Module.objects.create(course=self.course, title='Module 1')
+        self.lesson1 = Lesson.objects.create(module=self.module, title='Lesson 1')
+        self.lesson2 = Lesson.objects.create(module=self.module, title='Lesson 2')
+
+        Enrollment.objects.create(student=self.user, course=self.course)
+
+    def test_completion_percentage_zero(self):
+        percent = self.course.get_completion_percentage(self.user)
+        self.assertEqual(percent, 0)
+
+    def test_completion_percentage_half(self):
+        LessonProgress.objects.create(student=self.user, lesson=self.lesson1)
+        percent = self.course.get_completion_percentage(self.user)
+        self.assertEqual(percent, 50)
+
+    def test_completion_percentage_full(self):
+        LessonProgress.objects.create(student=self.user, lesson=self.lesson1)
+        LessonProgress.objects.create(student=self.user, lesson=self.lesson2)
+        percent = self.course.get_completion_percentage(self.user)
+        self.assertEqual(percent, 100)
+
+    def test_complete_lesson_view(self):
+        self.client.login(username='student', password='pass')
+        response = self.client.post(reverse('courses:complete_lesson', args=[self.lesson1.pk]))
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['lesson'], self.lesson1.pk)
+        self.assertEqual(data['percent'], 50)
+
+    def test_non_enrolled_user_gets_403(self):
+        other_user = self.User.objects.create_user(username="other", password="pass")
+        self.client.login(username="other", password="pass")
+        response = self.client.post(reverse('courses:complete_lesson', args=[self.lesson1.pk]))
+        self.assertEqual(response.status_code, 403)
+
+    def test_anonymous_user_redirected(self):
+        response = self.client.post(reverse('courses:complete_lesson', args=[self.lesson1.pk]))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/login/", response.url)
+
+    def test_get_request_returns_405(self):
+        self.client.login(username="student", password="pass")
+        response = self.client.get(reverse('courses:complete_lesson', args=[self.lesson1.pk]))
+        self.assertEqual(response.status_code, 405)
+
+    def test_double_click_creates_single_record(self):
+        self.client.login(username="student", password="pass")
+
+        # first click
+        response1 = self.client.post(reverse('courses:complete_lesson', args=[self.lesson1.pk]))
+        self.assertEqual(response1.status_code, 200)
+        percent1 = response1.json()["percent"]
+
+        # second click
+        response2 = self.client.post(reverse('courses:complete_lesson', args=[self.lesson1.pk]))
+        self.assertEqual(response2.status_code, 200)
+        percent2 = response2.json()["percent"]
+
+        # should only have one progress record
+        self.assertEqual(LessonProgress.objects.filter(student=self.user, lesson=self.lesson1).count(), 1)
+        # percentage should be the same
+        self.assertEqual(percent1, percent2)
+
+    def test_enrolled_student_cannot_complete_unpublished_course(self):
+        draft_course = Course.objects.create(
+            title='Draft Course',
+            description='Draft',
+            instructor=self.instructor,
+            status=Course.Status.DRAFT
+        )
+
+        draft_module = Module.objects.create(course=draft_course, title='Draft Module')
+        draft_lesson = Lesson.objects.create(module=draft_module, title='Draft Lesson')
+        
+        Enrollment.objects.create(student=self.user, course=draft_course)
+
+        self.client.login(username='student', password='pass')
+        response = self.client.post(reverse('courses:complete_lesson', args=[draft_lesson.pk]))
+        self.assertEqual(response.status_code, 403)
+
+    def test_enrolled_student_sees_progress_bar_and_button(self):
+        self.client.login(username='student', password='pass')
+        response = self.client.get(reverse('courses:lesson_view', args=[self.lesson1.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'progress-bar')
+        self.assertContains(response, 'complete-btn')
+        self.assertContains(response, 'Mark as Complete')
+    
+    def test_instructor_does_not_see_progress_controls(self):
+        self.client.login(username='instructor', password='pass')
+        response = self.client.get(reverse('courses:lesson_view', args=[self.lesson1.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'progress-bar')
+        self.assertNotContains(response, 'complete-btn')
+
+    def test_complete_lesson_shows_completed_state(self):
+        LessonProgress.objects.create(student=self.user, lesson=self.lesson1)
+
+        self.client.login(username='student', password='pass')
+        response = self.client.get(reverse('courses:lesson_view', args=[self.lesson1.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Completed')
+        self.assertContains(response, 'disabled')
+
+    def test_instructor_cannot_complete_lesson(self):
+        self.client.login(username='instructor', password='pass')
+        response = self.client.post(reverse('courses:complete_lesson', args=[self.lesson1.pk]))
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(LessonProgress.objects.filter(student=self.instructor, lesson=self.lesson1).exists())
+
+    def test_completion_percentage_isolated_per_student(self):
+        other_student = self.User.objects.create_user(username="other_student", password="pass")
+        Enrollment.objects.create(student=other_student, course=self.course)
+
+        LessonProgress.objects.create(student=self.user, lesson=self.lesson1)
+
+        percent1 = self.course.get_completion_percentage(self.user)
+        self.assertEqual(percent1, 50)
+
+        percent2 = self.course.get_completion_percentage(other_student)
+        self.assertEqual(percent2, 0)
 
 
 class LessonEmbedUrlTests(TestCase):
@@ -946,6 +1082,34 @@ class PublicCourseOutlineTests(TestCase):
         self.assertContains(response, "Meet Django")
         self.assertContains(response, "Install Django")
 
+    def test_guest_cannot_see_lesson_notes_on_public_outline(self):
+        secret_notes = "PRIVATE_NOTES_REGRESSION_CHECK"
+        self.first_lesson.notes = secret_notes
+        self.first_lesson.save(update_fields=["notes"])
+
+        response = self.client.get(self.outline_url())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, secret_notes)
+
+    def test_non_enrolled_student_cannot_see_lesson_notes_on_public_outline(self):
+        User = get_user_model()
+        student = User.objects.create_user(
+            username="outline_student",
+            password="testpass123",
+            role="STUDENT",
+        )
+
+        secret_notes = "PRIVATE_NOTES_REGRESSION_CHECK"
+        self.first_lesson.notes = secret_notes
+        self.first_lesson.save(update_fields=["notes"])
+
+        self.client.force_login(student)
+        response = self.client.get(self.outline_url())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, secret_notes)
+
     def test_outline_shows_module_and_lesson_totals(self):
         response = self.client.get(self.outline_url())
 
@@ -1255,6 +1419,32 @@ class LessonAccessTests(TestCase):
         response = self.client.get(self.url)
 
         self.assertEqual(response.status_code, 403)
+
+    def test_student_enrolled_in_other_course_gets_403(self):
+        other_course = Course.objects.create(
+            title="Another Course",
+            description="Another description",
+            instructor=self.instructor,
+            status=Course.Status.PUBLISHED,
+        )
+        Enrollment.objects.create(
+            student=self.other_student,
+            course=other_course,
+        )
+
+        self.client.login(
+            username="other_student",
+            password="testpass123",
+        )
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 403)
+        self.assertNotContains(
+            response,
+            "This is protected lesson content.",
+            status_code=403,
+        )
+
 
 class CourseFormThumbnailTests(TestCase):
     """Step 3: extension, real-image and size checks on the form itself."""
@@ -1624,3 +1814,125 @@ class CourseCatalogTests(TestCase):
         self.assertEqual(list(response.context["courses"]), [published])
         self.assertNotIn(draft, response.context["courses"])
         self.assertNotContains(response, "Draft course")
+
+
+class LessonDetailTemplateTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.instructor = User.objects.create_user(
+            username="classroom_instructor",
+            password="password123",
+            role="INSTRUCTOR",
+        )
+        self.student = User.objects.create_user(
+            username="classroom_student",
+            password="password123",
+            role="STUDENT",
+        )
+        self.course = Course.objects.create(
+            title="Django Masterclass",
+            instructor=self.instructor,
+            status=Course.Status.PUBLISHED,
+        )
+        Enrollment.objects.create(
+            student=self.student,
+            course=self.course,
+        )
+        self.module_1 = Module.objects.create(
+            course=self.course,
+            title="Getting Started",
+            order=1,
+        )
+        self.module_2 = Module.objects.create(
+            course=self.course,
+            title="Advanced Topics",
+            order=2,
+        )
+        self.lesson_1 = Lesson.objects.create(
+            module=self.module_1,
+            title="Installation",
+            notes="Step 1: Install Python\nStep 2: Install Django",
+            video_url="https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            order=1,
+        )
+        self.lesson_2 = Lesson.objects.create(
+            module=self.module_1,
+            title="Configuration",
+            notes="Set up settings.py",
+            video_url="https://example.com/not-a-valid-video",
+            order=2,
+        )
+        self.lesson_3 = Lesson.objects.create(
+            module=self.module_2,
+            title="Deployment",
+            notes="Deploy to production",
+            video_url="",
+            order=1,
+        )
+        self.client.force_login(self.student)
+
+    def test_sidebar_renders_course_title_modules_and_lessons(self):
+        url = reverse("courses:lesson_view", args=[self.lesson_1.id])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Django Masterclass")
+        self.assertContains(response, "Getting Started")
+        self.assertContains(response, "Advanced Topics")
+        self.assertContains(response, "Installation")
+        self.assertContains(response, "Configuration")
+        self.assertContains(response, "Deployment")
+        self.assertContains(response, 'id="courseAccordion"')
+
+    def test_accordion_preserves_bootstrap_and_accessibility_attributes(self):
+        url = reverse("courses:lesson_view", args=[self.lesson_1.id])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-bs-toggle="collapse"')
+        self.assertContains(response, f'data-bs-target="#collapse{self.module_1.id}"')
+        self.assertContains(response, 'data-bs-parent="#courseAccordion"')
+        self.assertContains(response, f'aria-controls="collapse{self.module_1.id}"')
+        self.assertContains(response, f'aria-labelledby="heading{self.module_1.id}"')
+
+    def test_current_lesson_highlighted_and_module_expanded(self):
+        url = reverse("courses:lesson_view", args=[self.lesson_1.id])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "active bg-primary text-white")
+        self.assertContains(response, f'id="collapse{self.module_1.id}"')
+        self.assertContains(response, "collapse show")
+        self.assertContains(response, "accordion-button collapsed")
+
+    def test_valid_video_embed_renders_iframe(self):
+        url = reverse("courses:lesson_view", args=[self.lesson_1.id])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ"')
+        self.assertNotContains(response, "Video link is not valid")
+
+    def test_invalid_video_embed_displays_fallback(self):
+        url = reverse("courses:lesson_view", args=[self.lesson_2.id])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Video link is not valid")
+        self.assertNotContains(response, "<iframe")
+
+    def test_no_video_shows_no_warning(self):
+        url = reverse("courses:lesson_view", args=[self.lesson_3.id])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Video link is not valid")
+        self.assertNotContains(response, "<iframe")
+
+    def test_lesson_notes_rendered_with_linebreaks(self):
+        url = reverse("courses:lesson_view", args=[self.lesson_1.id])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Installation")
+        self.assertContains(response, "Step 1: Install Python<br>Step 2: Install Django")

@@ -59,14 +59,29 @@
 
                 <div class="home-card-body">
                     <h3 class="home-card-title">
-                        <a href="{% url 'courses:outline' c.pk %}">{{ c.title }}</a>
+                        <a href="{% url 'courses:outline' c.pk %}">
+                            {{ c.title }}
+                        </a>
                     </h3>
+
                     {% if c.subtitle %}
                         <p class="home-card-sub">{{ c.subtitle|truncatechars:90 }}</p>
                     {% endif %}
+
                     <p class="home-card-meta">
                         by {{ c.instructor.get_full_name|default:c.instructor.username }}
                     </p>
+
+                    <div class="course-rating">
+                        {% if c.average_rating %}
+                            <span class="course-rating-score">
+                                {{ c.average_rating|floatformat:1 }}/5
+                            </span>
+                            <span class="course-rating-count">({{ c.review_count }} {% if c.review_count == 1 %}review{% else %}reviews{% endif %})</span>
+                        {% else %}
+                            <span class="course-rating-empty">No reviews yet</span>
+                        {% endif %}
+                    </div>
                 </div>
 
                 <div class="home-card-foot">
