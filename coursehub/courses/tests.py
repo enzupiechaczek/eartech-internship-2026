@@ -1726,6 +1726,16 @@ class CourseCatalogTests(TestCase):
         self.assertCountEqual(invalid.context["courses"], [python, ux])
         self.assertIsNone(invalid.context["selected_category"])
 
+    def test_unknown_numeric_category_is_ignored(self):
+        python = self.make_course(title="Python")
+        django = self.make_course(title="Django")
+
+        response = self.client.get(reverse("courses:list"), {"category": "99999"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.context["selected_category"])
+        self.assertCountEqual(response.context["courses"], [python, django])
+
     def test_catalog_is_paginated(self):
         for number in range(10):
             self.make_course(title=f"Course {number}")
