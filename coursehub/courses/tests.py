@@ -1420,6 +1420,32 @@ class LessonAccessTests(TestCase):
 
         self.assertEqual(response.status_code, 403)
 
+    def test_student_enrolled_in_other_course_gets_403(self):
+        other_course = Course.objects.create(
+            title="Another Course",
+            description="Another description",
+            instructor=self.instructor,
+            status=Course.Status.PUBLISHED,
+        )
+        Enrollment.objects.create(
+            student=self.other_student,
+            course=other_course,
+        )
+
+        self.client.login(
+            username="other_student",
+            password="testpass123",
+        )
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 403)
+        self.assertNotContains(
+            response,
+            "This is protected lesson content.",
+            status_code=403,
+        )
+
+
 class CourseFormThumbnailTests(TestCase):
     """Step 3: extension, real-image and size checks on the form itself."""
 
@@ -1749,3 +1775,4 @@ class LessonDetailTemplateTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Installation")
         self.assertContains(response, "Step 1: Install Python<br>Step 2: Install Django")
+
