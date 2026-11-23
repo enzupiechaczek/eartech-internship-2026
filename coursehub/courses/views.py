@@ -11,6 +11,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.views.decorators.http import require_POST
 from django.views.generic.edit import CreateView, UpdateView
+from django.views.generic import ListView
 
 from accounts.decorators import InstructorRequiredMixin, instructor_required
 from enrollments.models import Enrollment
@@ -171,14 +172,16 @@ def about(request):
     return render(request, "about.html")
 
 
-@instructor_required
-def studio(request):
-    courses = (
-        Course.objects.filter(instructor=request.user)
-        .select_related("category")
-        .order_by("-created_at")
-    )
-    return render(request, "courses/studio.html", {"courses": courses})
+class StudioView(InstructorRequiredMixin, ListView):
+    template_name = "courses/studio.html"
+    context_object_name = "courses"
+
+    def get_queryset(self):
+        return (
+            Course.objects.filter(instructor=self.request.user)
+            .select_related("category")
+            .order_by("-created_at")
+        )
 
 
 @instructor_required
