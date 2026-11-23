@@ -1,4 +1,6 @@
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.urls import reverse
 
@@ -118,3 +120,43 @@ class CourseRatingDisplayTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 404)
+        
+
+class ReviewModelTests(TestCase):
+    def setUp(self):
+        self.instructor = User.objects.create_user(username="teach", password="pass")
+        self.student = User.objects.create_user(username="stud", password="pass")
+        self.course = Course.objects.create(
+            title="Django Basics",
+            instructor=self.instructor,
+            description="Intro course.",
+            status=Course.Status.PUBLISHED,
+        )
+
+    def make_review(self, rating=5):
+        return Review(course=self.course, student=self.student, rating=rating)
+
+    def test_valid_review_is_saved(self):
+        review = self.make_review(rating=4)
+        review.full_clean()
+        review.save()
+        self.assertEqual(Review.objects.count(), 1)
+        self.assertEqual(str(review), "stud - Django Basics (4/5)")
+
+    def test_rating_1_and_5_are_allowed(self):
+        for rating in (1, 5):
+            self.make_review(rating=rating).full_clean()
+
+    def test_rating_0_is_rejected(self):
+        with self.assertRaises(ValidationError):
+            self.make_review(rating=0).full_clean()
+
+    def test_rating_6_is_rejected(self):
+        with self.assertRaises(ValidationError):
+            self.make_review(rating=6).full_clean()
+
+    def test_one_review_per_student_per_course(self):
+        Review.objects.create(course=self.course, student=self.student, rating=5)
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                Review.objects.create(course=self.course, student=self.student, rating=3)
