@@ -67,6 +67,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'core.context_processors.asset_version',
             ],
         },
     },
@@ -121,6 +122,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
 STATIC_URL = 'static/'
+STATICFILES_DIRS = [BASE_DIR / 'static']
 
 
 # Email
@@ -131,4 +133,16 @@ MAILERS = {
         'BACKEND': 'django.core.mail.backends.console.EmailBackend',
     },
 }
-AUTH_USER_MODEL= "accounts.User"
+AUTH_USER_MODEL = "accounts.User"
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+LOGIN_URL = "login"
+LOGIN_REDIRECT_URL = "home_redirect"
+LOGOUT_REDIRECT_URL = "login"
+
+# Uploaded files. Medical files under MEDIA_ROOT/medical/ are NEVER served
+# directly; they are streamed by records.views.download_file after an
+# authorization check. Only public doctor profile pictures are served in DEBUG.
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+PUBLIC_MEDIA_DIRS = ["doctor_profiles"]

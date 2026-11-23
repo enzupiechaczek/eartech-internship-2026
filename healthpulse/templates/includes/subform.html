@@ -1,0 +1,16 @@
+{# One row of an inline formset. DELETE becomes a "Remove" toggle, only on saved rows. #}
+{% for hidden in subform.hidden_fields %}{{ hidden }}{% endfor %}
+<div class="hp-subform-grid">
+    {% for field in subform.visible_fields %}
+        {% if field.name != "DELETE" %}
+            <div class="{% if field.name == 'instructions' %}is-wide{% endif %}">
+                {% include "includes/field.html" %}
+            </div>
+        {% endif %}
+    {% endfor %}
+</div>
+{% if subform.instance.pk and subform.DELETE %}
+    <label class="hp-remove">
+        {{ subform.DELETE }} <span>Remove {{ noun }}</span>
+    </label>
+{% endif %}

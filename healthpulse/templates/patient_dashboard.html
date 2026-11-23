@@ -1,83 +1,64 @@
-
 {% extends 'base.html' %}
 
+{% block title %}Dashboard | HealthPulse{% endblock %}
+
 {% block content %}
+<section class="hp-page-head">
+    <div>
+        <p class="hp-eyebrow">Patient portal</p>
+        <h1>Welcome {{ request.user.first_name|default:request.user.username }}</h1>
+    </div>
+    <div class="hp-actions">
+        <a href="{% url 'medical_history' %}" class="btn btn-outline-primary">My medical history</a>
+        <a href="{% url 'doctor_directory' %}" class="btn btn-primary">+ Book an appointment</a>
+    </div>
+</section>
 
-<h1>Welcome {{ request.user.first_name }}</h1>
+<div class="hp-split">
+    <section class="hp-split__main">
+        <div class="hp-card hp-card--flush">
+            <div class="hp-card__head">
+                <h2>My appointments</h2>
+            </div>
+            <div class="hp-table-wrap">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Date &amp; Time</th>
+                            <th>Doctor</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for a in appointments %}
+                        <tr>
+                            <td><span class="text-nowrap">{{ a.appointment_date|date:"j M Y" }}</span> <span class="text-nowrap text-muted">{{ a.time_slot|time:"H:i" }}</span></td>
+                            <td>Dr. {{ a.doctor.user.get_full_name|default:a.doctor.user.username }}</td>
+                            <td>{% include "includes/status.html" with appt=a %}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="3" class="text-center text-muted py-4">No appointments yet.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
 
-<h2>Patient Demographics</h2>
-
-<p><strong>Username:</strong> {{ request.user.username }}</p>
-<p><strong>First Name:</strong> {{ request.user.first_name }}</p>
-<p><strong>Last Name:</strong> {{ request.user.last_name }}</p>
-<p><strong>Email:</strong> {{ request.user.email }}</p>
-
-<hr>
-
-<h2 class="mb-3">My Appointments</h2>
-
-<div class="table-responsive">
-    <table class="table table-hover">
-        <thead>
-            <tr>
-                <th>Date & Time</th>
-                <th>Doctor</th>
-                <th>Status</th>
-            </tr>
-        </thead>
-
-        <tbody>
-            {% for a in appointments %}
-            <tr>
-                <td>
-                    {{ a.appointment_date|date:"d M" }}
-                    {{ a.time_slot|time:"H:i" }}
-                </td>
-
-                <td>
-                    Dr. {{ a.doctor.user.first_name }}
-                    {{ a.doctor.user.last_name }}
-                </td>
-
-                <td>
-                    {% if a.status == 'APPROVED' %}
-                        <span class="badge bg-success">
-                            {{ a.get_status_display }}
-                        </span>
-
-                    {% elif a.status == 'REJECTED' %}
-                        <span class="badge bg-danger">
-                            {{ a.get_status_display }}
-                        </span>
-
-                    {% elif a.status == 'COMPLETED' %}
-                        <span class="badge bg-primary">
-                            {{ a.get_status_display }}
-                        </span>
-
-                    {% elif a.status == 'IN_VISIT' %}
-                        <span class="badge bg-info text-dark">
-                            {{ a.get_status_display }}
-                        </span>
-
-                    {% else %}
-                        <span class="badge bg-warning text-dark">
-                            {{ a.get_status_display }}
-                        </span>
-                    {% endif %}
-                </td>
-            </tr>
-
-            {% empty %}
-            <tr>
-                <td colspan="3" class="text-center">
-                    No appointments yet.
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <aside class="hp-split__side">
+        <div class="hp-card">
+            <h2 class="mb-3">My details</h2>
+            <dl class="mb-0">
+                <dt class="hp-field-label">Username</dt>
+                <dd class="hp-field-value mb-3">{{ request.user.username }}</dd>
+                <dt class="hp-field-label">Name</dt>
+                <dd class="hp-field-value mb-3">{{ request.user.get_full_name|default:"—" }}</dd>
+                <dt class="hp-field-label">Email</dt>
+                <dd class="hp-field-value mb-0">{{ request.user.email|default:"Not provided" }}</dd>
+            </dl>
+        </div>
+    </aside>
 </div>
-
 {% endblock %}
-

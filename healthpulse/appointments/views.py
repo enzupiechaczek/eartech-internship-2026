@@ -1,10 +1,11 @@
 import json
 
+from django.contrib import messages
+from django.utils.dateformat import format as date_format
 from django.http import JsonResponse
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.views.decorators.http import require_POST
-
-from django.shortcuts import render, get_object_or_404, redirect
 
 from core.decorators import doctor_required, patient_required
 from core.models import DoctorProfile
@@ -37,6 +38,12 @@ def book(request, doctor_id):
         appt.status = Appointment.Status.PENDING
         appt.save()
 
+        messages.success(
+            request,
+            f"Appointment requested for {date_format(appt.appointment_date, 'j M Y')} "
+            f"at {appt.time_slot:%H:%M}. "
+            "You'll see it here once the doctor responds.",
+        )
         return redirect("patient_dashboard")
 
     return render(
@@ -68,6 +75,9 @@ def update_status(request, pk):
         or new_status not in valid_statuses
     ):
         return JsonResponse({'error': 'invalid transition'}, status=400)
+
+    if new_status == Appointment.Status.APPROVED and appointment.is_expired:
+        return JsonResponse({'error': 'This request has expired.'}, status=400)
 
     appointment.status = new_status
     appointment.save(update_fields=['status'])
