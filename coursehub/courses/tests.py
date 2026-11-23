@@ -1655,6 +1655,177 @@ class CourseThumbnailUploadViewTests(TestCase):
         self.assertEqual(course.thumbnail.name, old_name)
 
 
+class CourseCatalogTests(TestCase):
+    """AB#3327: catalogue template, normalized query, filters and paging."""
+
+    def setUp(self):
+        self.instructor = get_user_model().objects.create_user(
+            username="catalog-instructor",
+            password="pass",
+        )
+
+    def make_course(self, title, status=Course.Status.PUBLISHED, **kwargs):
+        return Course.objects.create(
+            title=title,
+            description=kwargs.pop("description", "A useful course."),
+            instructor=self.instructor,
+            status=status,
+            **kwargs,
+        )
+
+    def test_missing_and_blank_query_normalize_to_empty_string(self):
+        missing = self.client.get(reverse("courses:list"))
+        blank = self.client.get(reverse("courses:list"), {"q": "   "})
+
+        self.assertEqual(missing.status_code, 200)
+        self.assertTemplateUsed(missing, "courses/course_list.html")
+        self.assertEqual(missing.context["q"], "")
+        self.assertEqual(blank.context["q"], "")
+        self.assertContains(missing, 'value=""')
+
+    def test_query_with_surrounding_whitespace_is_normalized(self):
+        response = self.client.get(reverse("courses:list"), {"q": "  Django  "})
+
+        self.assertEqual(response.context["q"], "Django")
+        self.assertContains(response, 'value="Django"')
+
+    def test_query_filters_published_courses_case_insensitively(self):
+        django = self.make_course(
+            title="Django Fundamentals",
+            subtitle="Web framework",
+            description="Python for the web",
+        )
+        flask = self.make_course(title="Flask Basics")
+        draft = self.make_course(title="Django Draft", status=Course.Status.DRAFT)
+
+        by_title = self.client.get(reverse("courses:list"), {"q": "django"})
+        by_subtitle = self.client.get(reverse("courses:list"), {"q": "FRAMEWORK"})
+        by_description = self.client.get(reverse("courses:list"), {"q": "python"})
+
+        for response in (by_title, by_subtitle, by_description):
+            self.assertEqual(
+                list(response.context["courses"]),
+                [django],
+            )
+            self.assertNotIn(flask, response.context["courses"])
+            self.assertNotIn(draft, response.context["courses"])
+
+    def test_category_filter_and_invalid_category(self):
+        programming = Category.objects.create(name="Programming")
+        design = Category.objects.create(name="Design")
+        python = self.make_course(title="Python", category=programming)
+        ux = self.make_course(title="UX", category=design)
+
+        filtered = self.client.get(
+            reverse("courses:list"), {"category": design.pk}
+        )
+        self.assertEqual(list(filtered.context["courses"]), [ux])
+        self.assertEqual(filtered.context["selected_category"], design)
+
+        invalid = self.client.get(reverse("courses:list"), {"category": "abc"})
+        self.assertCountEqual(invalid.context["courses"], [python, ux])
+        self.assertIsNone(invalid.context["selected_category"])
+
+    def test_unknown_numeric_category_is_ignored(self):
+        python = self.make_course(title="Python")
+        django = self.make_course(title="Django")
+
+        response = self.client.get(reverse("courses:list"), {"category": "99999"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.context["selected_category"])
+        self.assertCountEqual(response.context["courses"], [python, django])
+
+    def test_catalog_is_paginated(self):
+        for number in range(10):
+            self.make_course(title=f"Course {number}")
+
+        first_page = self.client.get(reverse("courses:list"))
+        second_page = self.client.get(reverse("courses:list"), {"page": 2})
+        last_page = self.client.get(reverse("courses:list"), {"page": 999})
+
+        self.assertEqual(len(first_page.context["courses"]), 9)
+        self.assertTrue(first_page.context["page_obj"].has_next())
+        self.assertEqual(len(second_page.context["courses"]), 1)
+        self.assertEqual(len(last_page.context["courses"]), 1)
+        self.assertContains(first_page, "page=2")
+
+    def test_empty_state_for_query_with_no_matches(self):
+        self.make_course(title="Django Fundamentals")
+
+        response = self.client.get(reverse("courses:list"), {"q": "missing"})
+
+        self.assertEqual(list(response.context["courses"]), [])
+        self.assertContains(response, "No courses found.")
+
+    def test_result_summary_uses_total_across_pages(self):
+        for number in range(10):
+            self.make_course(title=f"Python {number}")
+
+        first_page = self.client.get(reverse("courses:list"), {"q": "Python"})
+        second_page = self.client.get(
+            reverse("courses:list"), {"q": "Python", "page": 2}
+        )
+
+        self.assertEqual(first_page.context["page_obj"].paginator.count, 10)
+        self.assertEqual(len(first_page.context["courses"]), 9)
+        self.assertEqual(len(second_page.context["courses"]), 1)
+        self.assertContains(first_page, "10 courses found")
+        self.assertContains(second_page, "10 courses found")
+
+    def test_combined_search_and_category_filter(self):
+        programming = Category.objects.create(name="Programming")
+        design = Category.objects.create(name="Design")
+        django = self.make_course(title="Django", category=programming)
+        django_design = self.make_course(title="Django UX", category=design)
+        flask = self.make_course(title="Flask", category=programming)
+        draft = self.make_course(
+            title="Django Draft",
+            status=Course.Status.DRAFT,
+            category=programming,
+        )
+
+        response = self.client.get(
+            reverse("courses:list"),
+            {"q": "django", "category": programming.pk},
+        )
+
+        self.assertEqual(list(response.context["courses"]), [django])
+        self.assertNotIn(django_design, response.context["courses"])
+        self.assertNotIn(flask, response.context["courses"])
+        self.assertNotIn(draft, response.context["courses"])
+
+    def test_pagination_links_preserve_both_filters(self):
+        category = Category.objects.create(name="Programming")
+        for number in range(10):
+            self.make_course(
+                title=f"Python & Django {number}", category=category
+            )
+
+        response = self.client.get(
+            reverse("courses:list"),
+            {"q": "Python & Django", "category": category.pk},
+        )
+
+        self.assertEqual(response.context["q"], "Python & Django")
+        self.assertEqual(response.context["selected_category"], category)
+        self.assertContains(
+            response,
+            f"q=Python%20%26%20Django&amp;category={category.pk}&amp;page=2",
+        )
+
+    def test_draft_courses_excluded_without_query(self):
+        published = self.make_course(title="Published course")
+        draft = self.make_course(title="Draft course", status=Course.Status.DRAFT)
+
+        response = self.client.get(reverse("courses:list"))
+
+        self.assertEqual(response.context["q"], "")
+        self.assertEqual(list(response.context["courses"]), [published])
+        self.assertNotIn(draft, response.context["courses"])
+        self.assertNotContains(response, "Draft course")
+
+
 class LessonDetailTemplateTests(TestCase):
     def setUp(self):
         User = get_user_model()
@@ -1775,4 +1946,3 @@ class LessonDetailTemplateTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Installation")
         self.assertContains(response, "Step 1: Install Python<br>Step 2: Install Django")
-
