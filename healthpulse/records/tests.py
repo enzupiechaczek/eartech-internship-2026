@@ -10,7 +10,7 @@ from .models import ClinicalEncounter, Prescription, MedicalFile
 from .permissions import has_relationship, require_relationship
 import tempfile
 from django.core.files.uploadedfile import SimpleUploadedFile
-
+import datetime
 
 User = get_user_model()
 
@@ -1870,3 +1870,93 @@ class VisitFlowFilesAndHistoryTests(TestCase):
         response = self.client.get(reverse("medical_history"))
 
         self.assertContains(response, "20 Nov 2026")
+
+class PrivacyTests(TestCase):
+    def setUp(self):
+        self.password = "TestPass123!"
+
+        self.patient_user = User.objects.create_user(
+            username="privacy_patient", password=self.password
+        )
+        self.assigned_doc_user = User.objects.create_user(
+            username="privacy_doc_assigned", password=self.password
+        )
+        self.unassigned_doc_user = User.objects.create_user(
+            username="privacy_doc_unassigned", password=self.password
+        )
+
+        if hasattr(User, "Role"):
+            self.assigned_doc_user.role = User.Role.DOCTOR
+            self.assigned_doc_user.save()
+            self.unassigned_doc_user.role = User.Role.DOCTOR
+            self.unassigned_doc_user.save()
+
+        self.patient = PatientProfile.objects.create(user=self.patient_user)
+        self.assigned_doctor = DoctorProfile.objects.create(
+            user=self.assigned_doc_user,
+            specialty="General",
+            clinic_branch="Main",
+        )
+        self.unassigned_doctor = DoctorProfile.objects.create(
+            user=self.unassigned_doc_user,
+            specialty="Cardiology",
+            clinic_branch="Branch 2",
+        )
+
+        self.appointment = Appointment.objects.create(
+            patient=self.patient,
+            doctor=self.assigned_doctor,
+            appointment_date=datetime.date.today() + datetime.timedelta(days=1),
+            time_slot=datetime.time(10, 0),
+            reason_for_visit="Routine checkup",
+            status=Appointment.Status.APPROVED,
+        )
+
+        sample_pdf = SimpleUploadedFile(
+            "privacy_report.pdf",
+            b"%PDF-1.4 test content",
+            content_type="application/pdf",
+        )
+        self.medical_file = MedicalFile.objects.create(
+            patient=self.patient,
+            file=sample_pdf,
+            file_type=MedicalFile.Type.LAB_REPORT,
+            title="Blood Test Report",
+        )
+
+    def test_anonymous_redirected_from_history(self):
+        response = self.client.get(reverse("medical_history"))
+        self.assertEqual(response.status_code, 302)
+
+    def test_unassigned_doctor_blocked_from_chart(self):
+        self.client.login(username="privacy_doc_unassigned", password=self.password)
+        response = self.client.get(
+            reverse("patient_medical_chart", args=[self.patient.pk])
+        )
+        self.assertIn(response.status_code, [403, 404])
+
+    def test_unassigned_doctor_cannot_download_file(self):
+        self.client.login(username="privacy_doc_unassigned", password=self.password)
+        response = self.client.get(
+            reverse("download_file", args=[self.medical_file.pk])
+        )
+        self.assertIn(response.status_code, [403, 404])
+
+    def test_unassigned_doctor_blocked_from_encounter_create(self):
+        self.client.login(username="privacy_doc_unassigned", password=self.password)
+        response = self.client.get(
+            reverse("encounter_create", args=[self.appointment.pk])
+        )
+        self.assertIn(response.status_code, [403, 404])
+
+    def test_patient_can_access_own_history(self):
+        self.client.login(username="privacy_patient", password=self.password)
+        response = self.client.get(reverse("medical_history"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_assigned_doctor_can_access_chart(self):
+        self.client.login(username="privacy_doc_assigned", password=self.password)
+        response = self.client.get(
+            reverse("patient_medical_chart", args=[self.patient.pk])
+        )
+        self.assertEqual(response.status_code, 200)
