@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}Upload a file | HealthPulse{% endblock %}
+
+{% block content %}
+<div class="hp-narrow-col">
+    <a href="{% url 'patient_medical_chart' patient.pk %}" class="hp-back">&larr; Back to chart</a>
+
+    <section class="hp-card">
+        <p class="hp-eyebrow">Patient: {{ patient.user.get_full_name|default:patient.user.username }}</p>
+        <h1 class="mb-4" style="font-size: 2rem;">Upload a diagnostic file</h1>
+
+        <form method="post" enctype="multipart/form-data" class="hp-form">
+            {% csrf_token %}
+            {% for field in form %}{% include "includes/field.html" %}{% endfor %}
+            <p class="text-muted small">PDF, JPG or PNG, up to 10 MB.</p>
+            <div class="hp-actions">
+                <button type="submit" class="btn btn-primary">Upload</button>
+                <a href="{% url 'patient_medical_chart' patient.pk %}" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </form>
+    </section>
+</div>
+{% endblock %}

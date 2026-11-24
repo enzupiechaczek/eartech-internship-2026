@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+
+{% block title %}Find a doctor | HealthPulse{% endblock %}
+
+{% block content %}
+<section class="hp-page-head">
+    <div>
+        <p class="hp-eyebrow">Doctor directory</p>
+        <h1>Find a doctor</h1>
+        <p>Search by name, specialty or clinic, then book a visit.</p>
+    </div>
+</section>
+
+<form method="get" class="hp-card hp-form hp-filters mb-4" role="search">
+    <div class="hp-filters__field">
+        <label class="hp-label" for="f-name">Doctor name</label>
+        <input id="f-name" type="text" name="name" placeholder="e.g. Smith" value="{{ selected_name }}">
+    </div>
+    <div class="hp-filters__field">
+        <label class="hp-label" for="f-specialty">Specialty</label>
+        <select id="f-specialty" name="specialty">
+            <option value="">All specialties</option>
+            {% for spec in specialties %}
+                {% if spec %}
+                <option value="{{ spec }}" {% if spec == selected_specialty %}selected{% endif %}>{{ spec }}</option>
+                {% endif %}
+            {% endfor %}
+        </select>
+    </div>
+    <div class="hp-filters__field">
+        <label class="hp-label" for="f-location">Clinic or location</label>
+        <input id="f-location" type="text" name="location" placeholder="e.g. Downtown" value="{{ selected_location }}">
+    </div>
+    <div class="hp-filters__actions">
+        <button type="submit" class="btn btn-primary">Search</button>
+        <a href="{% url 'doctor_directory' %}" class="btn btn-outline-secondary">Clear</a>
+    </div>
+</form>
+
+{% if doctors %}
+<div class="hp-doctor-grid">
+    {% for doctor in doctors %}
+    <article class="hp-card hp-doctor-card">
+        <div class="hp-doctor-card__head">
+            {% if doctor.profile_picture %}
+                <img src="{{ doctor.profile_picture.url }}" alt="" class="hp-avatar hp-avatar--sm">
+            {% else %}
+                <span class="hp-avatar hp-avatar--sm" aria-hidden="true">{% include "includes/initials.html" with u=doctor.user %}</span>
+            {% endif %}
+            <div>
+                <h2>Dr. {{ doctor.user.get_full_name|default:doctor.user.username }}</h2>
+                <span class="text-muted small">{{ doctor.specialty|default:"Specialty not specified" }}</span>
+            </div>
+        </div>
+        <p class="text-muted mb-0"><strong>Clinic:</strong> {{ doctor.clinic_branch|default:"Not specified" }}</p>
+        <a href="{% url 'doctor_detail' doctor.pk %}" class="btn btn-outline-primary mt-auto">View profile</a>
+    </article>
+    {% endfor %}
+</div>
+{% else %}
+<div class="hp-card hp-empty">
+    <h2>No doctors found</h2>
+    <p class="text-muted mb-3">No doctor matches your search. Try a different name, specialty or clinic.</p>
+    <a href="{% url 'doctor_directory' %}" class="btn btn-outline-secondary">Clear filters</a>
+</div>
+{% endif %}
+{% endblock %}

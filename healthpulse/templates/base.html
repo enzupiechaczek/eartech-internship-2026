@@ -1,0 +1,85 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}HealthPulse{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="{% static 'css/healthpulse.css' %}?v={{ ASSET_VERSION }}" rel="stylesheet">
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+    {% block body %}
+    {% with current=request.resolver_match.url_name %}
+    <header class="hp-nav">
+        <div class="hp-nav__inner">
+            <a class="hp-brand" href="{% url 'home' %}">
+                {% include "includes/logo.html" %}
+                <span>HealthPulse</span>
+            </a>
+            <button type="button" class="hp-nav__toggle" aria-expanded="false" aria-controls="hp-nav-links">
+                <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+                    <path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                </svg>
+                <span>Menu</span>
+            </button>
+            {% if user.is_authenticated %}
+            <nav class="hp-nav__links" id="hp-nav-links" aria-label="Main">
+                {% if user.is_doctor %}
+                <!-- <a class="hp-nav__link {% if current in doctor_pages %}is-active{% endif %}" href="{% url 'doctor_dashboard' %}">Dashboard</a> -->
+                <a class="hp-nav__link {% if current == 'my_patients' %}is-active{% endif %}"
+                    href="{% url 'my_patients' %}">My patients</a>
+                <a class="hp-nav__link {% if current == 'pending_requests' %}is-active{% endif %}"
+                    href="{% url 'pending_requests' %}">Pending requests</a>
+                <a class="hp-nav__link {% if current == 'doctor_dashboard' %}is-active{% endif %}"
+                    href="{% url 'doctor_dashboard' %}">Dashboard</a>
+                {% elif user.is_patient %}
+                <a class="hp-nav__link {% if current == 'patient_dashboard' %}is-active{% endif %}"
+                    href="{% url 'patient_dashboard' %}">Dashboard</a>
+                <a class="hp-nav__link {% if current == 'medical_history' %}is-active{% endif %}"
+                    href="{% url 'medical_history' %}">Medical history</a>
+                <a class="hp-nav__link {% if current in directory_pages %}is-active{% endif %}"
+                    href="{% url 'doctor_directory' %}">Find a doctor</a>
+                {% endif %}
+                <form method="post" action="{% url 'logout' %}" class="m-0">
+                    {% csrf_token %}
+                    <button type="submit" class="hp-nav__logout">Log out</button>
+                </form>
+            </nav>
+            {% else %}
+            <nav class="hp-nav__links" id="hp-nav-links" aria-label="Account">
+                <a class="hp-nav__link" href="{% url 'login' %}">Log in</a>
+                <a class="hp-nav__link" href="{% url 'register' %}">Create account</a>
+            </nav>
+            {% endif %}
+        </div>
+    </header>
+    {% endwith %}
+    <main class="hp-main {% block main_class %}{% endblock %}">
+        {% include "includes/messages.html" %}
+        {% block content %}{% endblock %}
+    </main>
+    {% endblock %}
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            var toggle = document.querySelector(".hp-nav__toggle");
+            var links = document.getElementById("hp-nav-links");
+            if (!toggle || !links) { return; }
+            toggle.addEventListener("click", function () {
+                var open = toggle.getAttribute("aria-expanded") === "true";
+                toggle.setAttribute("aria-expanded", String(!open));
+                links.classList.toggle("is-open", !open);
+                toggle.querySelector("span").textContent = open ? "Menu" : "Close";
+            });
+        });
+    </script>
+</body>
+
+</html>

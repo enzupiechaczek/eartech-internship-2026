@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-4">
+    <h2 class="mb-4">دليل الأطباء</h2>
+
+    <!-- فلاتر البحث -->
+    <form method="get" class="card card-body mb-4 shadow-sm">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <input type="text" name="name" class="form-control" placeholder="ابحث باسم الطبيب..." value="{{ selected_name }}">
+            </div>
+            <div class="col-md-3">
+                <select name="specialty" class="form-select">
+                    <option value="">كل الاختصاصات</option>
+                    {% for spec in specialties %}
+                        <option value="{{ spec }}" {% if spec == selected_specialty %}selected{% endif %}>{{ spec }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <input type="text" name="location" class="form-control" placeholder="الفرع أو العيادة..." value="{{ selected_location }}">
+            </div>
+            <div class="col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-primary w-100">بحث</button>
+                <a href="{% url 'doctor_directory' %}" class="btn btn-outline-secondary">إلغاء</a>
+            </div>
+        </div>
+    </form>
+
+    <!-- قائمة الأطباء -->
+    <div class="row">
+        {% for doctor in doctors %}
+            <div class="col-md-4 mb-3">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            د. {{ doctor.user.first_name }} {{ doctor.user.last_name }}
+                            {% if not doctor.user.first_name and not doctor.user.last_name %}
+                                {{ doctor.user.username }}
+                            {% endif %}
+                        </h5>
+                        <p class="card-text text-muted mb-1"><strong>الاختصاص:</strong> {{ doctor.specialty|default:"غير محدد" }}</p>
+                        <p class="card-text text-muted mb-1"><strong>العيادة / الفرع:</strong> {{ doctor.clinic_branch|default:"غير محدد" }}</p>
+                    </div>
+                </div>
+            </div>
+        {% empty %}
+            <div class="col-12">
+                <div class="alert alert-info">لا يوجد أطباء مطابقين لشروط البحث الحالية.</div>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
