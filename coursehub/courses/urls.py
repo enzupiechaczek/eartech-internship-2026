@@ -61,9 +61,4 @@ urlpatterns = [
         views.lesson_delete,
         name='lesson_delete',
     ),
-    path(
-        'lessons/<int:lesson_id>/complete/',
-        views.complete_lesson,
-        name='complete_lesson',
-    ),
 ]
