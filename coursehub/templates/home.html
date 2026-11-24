@@ -32,6 +32,7 @@
     </ul>
 </section>
 
+<!-- Featured Courses -->
 <section class="home-courses">
     <div class="home-section-head">
         <div>
@@ -77,7 +78,9 @@
                             <span class="course-rating-score">
                                 {{ c.average_rating|floatformat:1 }}/5
                             </span>
-                            <span class="course-rating-count">({{ c.review_count }} {% if c.review_count == 1 %}review{% else %}reviews{% endif %})</span>
+                            <span class="course-rating-count">
+                                ({{ c.review_count }} {% if c.review_count == 1 %}review{% else %}reviews{% endif %})
+                            </span>
                         {% else %}
                             <span class="course-rating-empty">No reviews yet</span>
                         {% endif %}
@@ -98,6 +101,70 @@
                 {% if user.is_authenticated and user.is_instructor %}
                     <a class="home-btn home-btn-primary" href="{% url 'courses:course_create' %}">Create your first course</a>
                 {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+</section>
+
+<!-- Most Popular Courses -->
+<section class="home-courses">
+    <div class="home-section-head">
+        <div>
+            <span class="home-eyebrow home-eyebrow-dark">Top courses</span>
+            <h2 class="home-section-title">Most Popular Courses</h2>
+            <p class="home-section-text">
+                Discover courses with the most student enrolments.
+            </p>
+        </div>
+        <a class="home-link" href="{% url 'courses:list' %}">View all courses</a>
+    </div>
+
+    <div class="home-grid">
+        {% for c in popular_courses %}
+            <article class="home-card">
+                <a class="home-card-media" href="{% url 'courses:outline' c.pk %}">
+                    <img
+                        src="{% if c.thumbnail %}{{ c.thumbnail.url }}{% else %}https://placehold.co/600x338/e2e8f0/64748b?text=Course{% endif %}"
+                        alt="{{ c.title }}"
+                        loading="lazy">
+                    {% if c.category %}
+                        <span class="home-badge">{{ c.category.name }}</span>
+                    {% endif %}
+                </a>
+
+                <div class="home-card-body">
+                    <h3 class="home-card-title">
+                        <a href="{% url 'courses:outline' c.pk %}">
+                            {{ c.title }}
+                        </a>
+                    </h3>
+
+                    {% if c.subtitle %}
+                        <p class="home-card-sub">{{ c.subtitle|truncatechars:90 }}</p>
+                    {% endif %}
+
+                    <p class="home-card-meta">
+                        by {{ c.instructor.get_full_name|default:c.instructor.username }}
+                    </p>
+
+                    <p class="home-card-meta">
+                        {{ c.attendee_count }}
+                        {% if c.attendee_count == 1 %}student{% else %}students{% endif %}
+                        enrolled
+                    </p>
+                </div>
+
+                <div class="home-card-foot">
+                    <span class="home-price{% if not c.price %} home-price-free{% endif %}">
+                        {% if c.price > 0 %}${{ c.price|floatformat:2 }}{% else %}Free{% endif %}
+                    </span>
+                    <a class="home-card-cta" href="{% url 'courses:outline' c.pk %}">View outline &rarr;</a>
+                </div>
+            </article>
+        {% empty %}
+            <div class="home-empty">
+                <h3>No popular courses yet.</h3>
+                <p>Published courses will appear here.</p>
             </div>
         {% endfor %}
     </div>
