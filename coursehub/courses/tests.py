@@ -63,7 +63,7 @@ class LessonProgressTests(TestCase):
 
     def test_complete_lesson_view(self):
         self.client.login(username='student', password='pass')
-        response = self.client.post(reverse('courses:complete_lesson', args=[self.lesson1.pk]))
+        response = self.client.post(reverse('courses_api:complete_lesson', args=[self.lesson1.pk]))
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data['lesson'], self.lesson1.pk)
@@ -72,29 +72,29 @@ class LessonProgressTests(TestCase):
     def test_non_enrolled_user_gets_403(self):
         other_user = self.User.objects.create_user(username="other", password="pass")
         self.client.login(username="other", password="pass")
-        response = self.client.post(reverse('courses:complete_lesson', args=[self.lesson1.pk]))
+        response = self.client.post(reverse('courses_api:complete_lesson', args=[self.lesson1.pk]))
         self.assertEqual(response.status_code, 403)
 
     def test_anonymous_user_redirected(self):
-        response = self.client.post(reverse('courses:complete_lesson', args=[self.lesson1.pk]))
+        response = self.client.post(reverse('courses_api:complete_lesson', args=[self.lesson1.pk]))
         self.assertEqual(response.status_code, 302)
         self.assertIn("/login/", response.url)
 
     def test_get_request_returns_405(self):
         self.client.login(username="student", password="pass")
-        response = self.client.get(reverse('courses:complete_lesson', args=[self.lesson1.pk]))
+        response = self.client.get(reverse('courses_api:complete_lesson', args=[self.lesson1.pk]))
         self.assertEqual(response.status_code, 405)
 
     def test_double_click_creates_single_record(self):
         self.client.login(username="student", password="pass")
 
         # first click
-        response1 = self.client.post(reverse('courses:complete_lesson', args=[self.lesson1.pk]))
+        response1 = self.client.post(reverse('courses_api:complete_lesson', args=[self.lesson1.pk]))
         self.assertEqual(response1.status_code, 200)
         percent1 = response1.json()["percent"]
 
         # second click
-        response2 = self.client.post(reverse('courses:complete_lesson', args=[self.lesson1.pk]))
+        response2 = self.client.post(reverse('courses_api:complete_lesson', args=[self.lesson1.pk]))
         self.assertEqual(response2.status_code, 200)
         percent2 = response2.json()["percent"]
 
@@ -117,7 +117,7 @@ class LessonProgressTests(TestCase):
         Enrollment.objects.create(student=self.user, course=draft_course)
 
         self.client.login(username='student', password='pass')
-        response = self.client.post(reverse('courses:complete_lesson', args=[draft_lesson.pk]))
+        response = self.client.post(reverse('courses_api:complete_lesson', args=[draft_lesson.pk]))
         self.assertEqual(response.status_code, 403)
 
     def test_enrolled_student_sees_progress_bar_and_button(self):
@@ -146,7 +146,7 @@ class LessonProgressTests(TestCase):
 
     def test_instructor_cannot_complete_lesson(self):
         self.client.login(username='instructor', password='pass')
-        response = self.client.post(reverse('courses:complete_lesson', args=[self.lesson1.pk]))
+        response = self.client.post(reverse('courses_api:complete_lesson', args=[self.lesson1.pk]))
         self.assertEqual(response.status_code, 403)
         self.assertFalse(LessonProgress.objects.filter(student=self.instructor, lesson=self.lesson1).exists())
 
