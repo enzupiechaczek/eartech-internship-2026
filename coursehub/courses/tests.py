@@ -49,12 +49,35 @@ class LessonProgressTests(TestCase):
     def test_completion_percentage_zero(self):
         percent = self.course.get_completion_percentage(self.user)
         self.assertEqual(percent, 0)
+    def test_completion_percentage_zero_when_course_has_no_lessons(self):
+        empty_course = Course.objects.create(
+            title='Empty Course',
+            description='Course without lessons',
+            instructor=self.instructor,
+            status=Course.Status.PUBLISHED
+        )
+
+        percent = empty_course.get_completion_percentage(self.user)
+        self.assertEqual(percent, 0)
 
     def test_completion_percentage_half(self):
         LessonProgress.objects.create(student=self.user, lesson=self.lesson1)
         percent = self.course.get_completion_percentage(self.user)
         self.assertEqual(percent, 50)
+    def test_completion_percentage_rounds_partial_progress(self):
+        lesson3 = Lesson.objects.create(
+            module=self.module,
+            title='Lesson 3'
+        )
 
+        LessonProgress.objects.create(
+            student=self.user,
+            lesson=self.lesson1
+        )
+
+        percent = self.course.get_completion_percentage(self.user)
+
+        self.assertEqual(percent, 33)
     def test_completion_percentage_full(self):
         LessonProgress.objects.create(student=self.user, lesson=self.lesson1)
         LessonProgress.objects.create(student=self.user, lesson=self.lesson2)
@@ -113,7 +136,7 @@ class LessonProgressTests(TestCase):
 
         draft_module = Module.objects.create(course=draft_course, title='Draft Module')
         draft_lesson = Lesson.objects.create(module=draft_module, title='Draft Lesson')
-        
+
         Enrollment.objects.create(student=self.user, course=draft_course)
 
         self.client.login(username='student', password='pass')
@@ -127,7 +150,7 @@ class LessonProgressTests(TestCase):
         self.assertContains(response, 'progress-bar')
         self.assertContains(response, 'complete-btn')
         self.assertContains(response, 'Mark as Complete')
-    
+
     def test_instructor_does_not_see_progress_controls(self):
         self.client.login(username='instructor', password='pass')
         response = self.client.get(reverse('courses:lesson_view', args=[self.lesson1.pk]))

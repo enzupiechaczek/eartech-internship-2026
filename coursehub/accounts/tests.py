@@ -9,6 +9,7 @@ from django.core.exceptions import PermissionDenied
 from django.views import View
 from accounts.decorators import instructor_required
 from accounts.decorators import InstructorRequiredMixin
+from accounts.forms import RegisterForm
 
 
 # --- Dummy views for testing ---
@@ -196,3 +197,53 @@ class RegistrationTest(TestCase):
         self.assertEqual(response.status_code, 302)
         user = User.objects.get(username='instructor_test')
         self.assertEqual(user.role, User.Role.INSTRUCTOR)
+
+
+class RegistrationFormTests(TestCase):
+
+    def test_valid_registration_form(self):
+        form = RegisterForm(data={
+            'username': 'formstudent',
+            'email': 'formstudent@test.com',
+            'role': User.Role.STUDENT,
+            'password1': 'StrongPass123!',
+            'password2': 'StrongPass123!',
+        })
+
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_invalid_email_is_rejected(self):
+        form = RegisterForm(data={
+            'username': 'bademail',
+            'email': 'not-an-email',
+            'role': User.Role.STUDENT,
+            'password1': 'StrongPass123!',
+            'password2': 'StrongPass123!',
+        })
+
+        self.assertFalse(form.is_valid())
+        self.assertIn('email', form.errors)
+
+    def test_mismatched_passwords_are_rejected(self):
+        form = RegisterForm(data={
+            'username': 'passwordmismatch',
+            'email': 'mismatch@test.com',
+            'role': User.Role.STUDENT,
+            'password1': 'StrongPass123!',
+            'password2': 'DifferentPass456!',
+        })
+
+        self.assertFalse(form.is_valid())
+        self.assertIn('password2', form.errors)
+
+    def test_invalid_role_is_rejected(self):
+        form = RegisterForm(data={
+            'username': 'badrole',
+            'email': 'badrole@test.com',
+            'role': 'ADMIN',
+            'password1': 'StrongPass123!',
+            'password2': 'StrongPass123!',
+        })
+
+        self.assertFalse(form.is_valid())
+        self.assertIn('role', form.errors)
