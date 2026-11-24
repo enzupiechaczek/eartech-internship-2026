@@ -14,6 +14,7 @@ from appointments.models import Appointment
 from core.decorators import doctor_required, patient_required
 from core.models import PatientProfile
 
+
 from .forms import (
     ClinicalEncounterForm,
     MedicalFileForm,
@@ -492,3 +493,14 @@ def medical_history(request):
         "records/medical_history.html",
         {"encounters": encounters, "other_files": other_files},
     )
+
+
+
+@doctor_required
+def my_patients(request):
+    doc = request.user.doctorprofile
+    patients = PatientProfile.objects.filter(
+        appointments__doctor=doc,
+        appointments__status__in=["APPROVED", "COMPLETED"],
+    ).select_related("user").distinct()
+    return render(request, "records/my_patients.html", {"patients": patients})
