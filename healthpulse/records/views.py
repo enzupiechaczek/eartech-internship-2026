@@ -468,7 +468,13 @@ def medical_file_upload(request, patient_id):
 @patient_required
 def medical_history(request):
     """Patient-facing timeline of their own completed visits."""
-    patient = get_object_or_404(PatientProfile, user=request.user)
+    patient = getattr(request.user, "patientprofile", None)
+    if patient is None:
+        messages.error(
+            request,
+            "Your patient profile is missing. Please contact support.",
+        )
+        return redirect("patient_dashboard")
 
     encounters = (
         ClinicalEncounter.objects.filter(

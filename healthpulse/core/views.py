@@ -1,6 +1,7 @@
 from django.contrib.auth import login
 from django.contrib.auth.views import LoginView, LogoutView
 from django.core.exceptions import PermissionDenied
+from django.db import transaction
 from django.shortcuts import render, redirect
 from django.urls import reverse
 from django.db.models import Count, Q
@@ -18,12 +19,13 @@ def register_view(request):
     if request.method == 'POST':
         form = RoleRegistrationForm(request.POST)
         if form.is_valid():
-            user = form.save()
+            with transaction.atomic():
+                user = form.save()
 
-            if user.is_doctor:
-                DoctorProfile.objects.create(user=user)
-            else:
-                PatientProfile.objects.create(user=user)
+                if user.is_doctor:
+                    DoctorProfile.objects.get_or_create(user=user)
+                else:
+                    PatientProfile.objects.get_or_create(user=user)
 
             login(request, user)
             return redirect(user.dashboard_url_name)
