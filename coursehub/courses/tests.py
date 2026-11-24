@@ -1946,3 +1946,121 @@ class LessonDetailTemplateTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Installation")
         self.assertContains(response, "Step 1: Install Python<br>Step 2: Install Django")
+
+
+class CourseListFeatureTests(TestCase):
+    def setUp(self):
+        self.category = Category.objects.create(name="Python")
+        self.other_category = Category.objects.create(name="Django")
+        self.instructor = get_user_model().objects.create_user(
+            username="catalog_instructor",
+            password="testpass123",
+        )
+        self.course1 = Course.objects.create(
+            title="Python Basics",
+            subtitle="Learn Python",
+            description="Python programming course",
+            category=self.category,
+            instructor=self.instructor,
+            price=100,
+            status=Course.Status.PUBLISHED,
+        )
+        self.course2 = Course.objects.create(
+            title="Advanced Python",
+            subtitle="Advanced programming",
+            description="Deep dive into Python",
+            category=self.category,
+            instructor=self.instructor,
+            price=150,
+            status=Course.Status.PUBLISHED,
+        )
+        self.course3 = Course.objects.create(
+            title="Django Web Development",
+            subtitle="Build web apps",
+            description="Learn Django framework",
+            category=self.other_category,
+            instructor=self.instructor,
+            price=200,
+            status=Course.Status.PUBLISHED,
+        )
+        self.course4 = Course.objects.create(
+            title="Draft Python Course",
+            subtitle="Unpublished course",
+            description="This course is not published",
+            category=self.category,
+            instructor=self.instructor,
+            price=50,
+            status=Course.Status.DRAFT,
+        )
+    def test_category_filter_returns_only_selected_category(self):
+        response = self.client.get(
+            reverse("courses:list"),
+            {"category": self.category.id},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Python Basics")
+        self.assertContains(response, "Advanced Python")
+        self.assertNotContains(response, "Django Web Development")
+        self.assertNotContains(response, "Draft Python Course")
+
+    def test_search_and_category_filter_work_together(self):
+        response = self.client.get(
+            reverse("courses:list"),
+            {"q": "Advanced", "category": self.category.id},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Advanced Python")
+        self.assertNotContains(response, "Python Basics")
+        self.assertNotContains(response, "Django Web Development")
+
+    def test_draft_courses_are_not_displayed(self):
+        response = self.client.get(reverse("courses:list"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Draft Python Course")
+
+    def test_course_list_is_paginated(self):
+        for i in range(7):
+            Course.objects.create(
+                title=f"Extra Python Course {i}",
+                subtitle="Extra course",
+                description="Extra Python course description",
+                category=self.category,
+                instructor=self.instructor,
+                price=100,
+                status=Course.Status.PUBLISHED,
+            )
+
+        response = self.client.get(reverse("courses:list"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["page_obj"].paginator.per_page, 9)
+        self.assertEqual(response.context["page_obj"].paginator.count, 10)
+        self.assertEqual(len(response.context["page_obj"]), 9)
+        self.assertTrue(response.context["page_obj"].has_next())
+
+    def test_second_page_contains_remaining_course(self):
+        for i in range(7):
+            Course.objects.create(
+                title=f"Extra Python Course {i}",
+                subtitle="Extra course",
+                description="Extra Python course description",
+                category=self.category,
+                instructor=self.instructor,
+                price=100,
+                status=Course.Status.PUBLISHED,
+            )
+
+        response = self.client.get(
+            reverse("courses:list"),
+            {"page": 2},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["page_obj"].number, 2)
+        self.assertEqual(len(response.context["page_obj"]), 1)
+
+
+
