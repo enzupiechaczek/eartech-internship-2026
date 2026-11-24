@@ -3,6 +3,8 @@
 {% block title %}Course catalogue | CourseHub{% endblock %}
 
 {% block content %}
+{% with q=q|default:"" %}
+{% with search_query=search_query|default:q paginator=paginator|default:page_obj.paginator %}
 <div class="container py-4">
     <header class="mb-4">
         <span class="home-eyebrow home-eyebrow-dark">Catalogue</span>
@@ -20,7 +22,7 @@
                 id="catalog-search"
                 type="search"
                 name="q"
-                value="{{ q }}"
+                value="{{ search_query }}"
                 placeholder="Search by title, subtitle or description">
         </div>
         <div class="col-12 col-md-3">
@@ -40,18 +42,18 @@
         </div>
     </form>
 
-    {% if q or selected_category %}
+    {% if search_query or selected_category %}
         <p class="text-muted mb-3">
-            {{ page_obj.paginator.count }} course{{ page_obj.paginator.count|pluralize }} found
-            {% if q %}for &ldquo;{{ q }}&rdquo;{% endif %}
+            {{ paginator.count }} course{{ paginator.count|pluralize }} found
+            {% if search_query %}for &ldquo;{{ search_query }}&rdquo;{% endif %}
             {% if selected_category %}in {{ selected_category.name }}{% endif %}.
             <a class="ms-2" href="{% url 'courses:list' %}">Clear filters</a>
         </p>
     {% endif %}
 
-    {% if courses %}
+    {% if page_obj.object_list %}
         <div class="home-grid">
-            {% for course in courses %}
+            {% for course in page_obj.object_list %}
                 <article class="home-card">
                     <a class="home-card-media" href="{% url 'courses:outline' course.pk %}">
                         <img
@@ -87,26 +89,29 @@
             {% endfor %}
         </div>
 
-        {% if page_obj.has_other_pages %}
+        {% if paginator.num_pages > 1 %}
             <nav class="mt-4" aria-label="Catalogue pages">
+                <p class="text-muted small mb-2 text-center">
+                    Page {{ page_obj.number }} of {{ paginator.num_pages }}
+                </p>
                 <ul class="pagination justify-content-center">
                     {% if page_obj.has_previous %}
                         <li class="page-item">
-                            <a class="page-link" href="?{% if q %}q={{ q|urlencode }}&amp;{% endif %}{% if selected_category %}category={{ selected_category.pk }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">Previous</a>
+                            <a class="page-link" href="?{% if search_query %}q={{ search_query|urlencode }}&amp;{% endif %}{% if selected_category %}category={{ selected_category.pk }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">Previous</a>
                         </li>
                     {% else %}
                         <li class="page-item disabled"><span class="page-link">Previous</span></li>
                     {% endif %}
 
-                    {% for number in page_obj.paginator.page_range %}
+                    {% for number in paginator.page_range %}
                         <li class="page-item{% if number == page_obj.number %} active{% endif %}">
-                            <a class="page-link" href="?{% if q %}q={{ q|urlencode }}&amp;{% endif %}{% if selected_category %}category={{ selected_category.pk }}&amp;{% endif %}page={{ number }}">{{ number }}</a>
+                            <a class="page-link" href="?{% if search_query %}q={{ search_query|urlencode }}&amp;{% endif %}{% if selected_category %}category={{ selected_category.pk }}&amp;{% endif %}page={{ number }}"{% if number == page_obj.number %} aria-current="page"{% endif %}>{{ number }}</a>
                         </li>
                     {% endfor %}
 
                     {% if page_obj.has_next %}
                         <li class="page-item">
-                            <a class="page-link" href="?{% if q %}q={{ q|urlencode }}&amp;{% endif %}{% if selected_category %}category={{ selected_category.pk }}&amp;{% endif %}page={{ page_obj.next_page_number }}">Next</a>
+                            <a class="page-link" href="?{% if search_query %}q={{ search_query|urlencode }}&amp;{% endif %}{% if selected_category %}category={{ selected_category.pk }}&amp;{% endif %}page={{ page_obj.next_page_number }}">Next</a>
                         </li>
                     {% else %}
                         <li class="page-item disabled"><span class="page-link">Next</span></li>
@@ -118,7 +123,7 @@
         <div class="home-empty">
             <h2>No courses found.</h2>
             <p>
-                {% if q or selected_category %}
+                {% if search_query or selected_category %}
                     Try a different search term or category.
                 {% else %}
                     Published courses will appear here as soon as instructors add them.
@@ -128,4 +133,6 @@
         </div>
     {% endif %}
 </div>
+{% endwith %}
+{% endwith %}
 {% endblock %}
