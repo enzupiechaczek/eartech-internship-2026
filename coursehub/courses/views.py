@@ -84,11 +84,29 @@ def course_outline(request, pk):
             course=course,
         ).exists()
     )
+    progress_percentage = 0
+    can_review = False
+    has_reviewed = False
+
+    if request.user.is_authenticated and is_enrolled:
+        progress_percentage = course.get_completion_percentage(request.user)
+
+        can_review = (
+            request.user.role == request.user.Role.STUDENT
+            and progress_percentage >= 50
+        )
+
+        has_reviewed = course.reviews.filter(
+            student=request.user
+        ).exists()
 
     return render(
         request,
         "courses/course_outline.html",
         {
+            "progress_percentage": progress_percentage,
+            "can_review": can_review,
+            "has_reviewed": has_reviewed,
             "course": course,
             "modules": modules,
             "lesson_count": sum(
