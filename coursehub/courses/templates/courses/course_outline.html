@@ -104,6 +104,52 @@
             <p>No student reviews yet.</p>
         {% endfor %}
     </section>
+    
+{% if can_review and not has_reviewed %}
+    <div class="outline-review-form">
+        <h3>Share your experience</h3>
+
+        <p>
+            Your course progress: {{ progress_percentage }}%
+        </p>
+
+        <form method="post"
+              action="{% url 'reviews:create' course.id %}">
+            {% csrf_token %}
+
+            <label for="rating">Your rating</label>
+            <select name="rating" id="rating" required>
+                <option value="">Choose a rating</option>
+                <option value="5">★★★★★ - Excellent</option>
+                <option value="4">★★★★☆ - Very good</option>
+                <option value="3">★★★☆☆ - Good</option>
+                <option value="2">★★☆☆☆ - Fair</option>
+                <option value="1">★☆☆☆☆ - Poor</option>
+            </select>
+
+            <label for="comment">Your comment</label>
+            <textarea
+                name="comment"
+                id="comment"
+                rows="4"
+                placeholder="What did you think about this course?"
+            ></textarea>
+
+            <button type="submit" class="home-btn home-btn-primary">
+                Submit Review
+            </button>
+        </form>
+    </div>
+
+{% elif is_enrolled and progress_percentage < 50 %}
+    <p>
+        Complete at least 50% of this course to leave a review.
+        Current progress: {{ progress_percentage }}%
+    </p>
+
+{% elif has_reviewed %}
+    <p>You have already reviewed this course. Thank you!</p>
+{% endif %}
 
     <aside class="outline-cta">
 
