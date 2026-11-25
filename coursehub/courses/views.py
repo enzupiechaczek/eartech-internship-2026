@@ -434,10 +434,11 @@ def toggle_publish(request, pk):
     return redirect("studio")
 
 
-@login_required
 @require_POST
 def complete_lesson(request, lesson_id):
     """Mark a lesson as complete via AJAX."""
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "Authentication required"}, status=401)
     lesson = get_object_or_404(Lesson, pk=lesson_id)
     course = lesson.module.course
 

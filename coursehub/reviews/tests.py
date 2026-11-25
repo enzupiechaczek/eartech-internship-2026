@@ -66,6 +66,23 @@ class CourseRatingDisplayTests(TestCase):
         self.assertContains(response, "Excellent course")
         self.assertContains(response, "Clear explanations")
 
+    def test_course_outline_displays_average_rating_for_single_review(self):
+        Review.objects.create(
+            course=self.course,
+            student=self.student_one,
+            rating=4,
+            comment="Very helpful course",
+        )
+
+        response = self.client.get(
+            reverse("courses:outline", args=[self.course.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["average_rating"], 4.0)
+        self.assertEqual(response.context["review_count"], 1)
+        self.assertContains(response, "4.0/5")
+
     def test_homepage_displays_average_rating_on_course_card(self):
         Review.objects.create(
             course=self.course,
@@ -97,6 +114,16 @@ class CourseRatingDisplayTests(TestCase):
         self.assertEqual(home_response.status_code, 200)
         self.assertContains(outline_response, "No reviews yet")
         self.assertContains(home_response, "No reviews yet")
+        self.assertIsNone(outline_response.context["average_rating"])
+        self.assertEqual(outline_response.context["review_count"], 0)
+
+        self.assertIsNone(
+            home_response.context["courses"][0].average_rating
+        )
+        self.assertEqual(
+            home_response.context["courses"][0].review_count,
+            0,
+        )
 
     def test_homepage_displays_singular_review_label(self):
         Review.objects.create(
