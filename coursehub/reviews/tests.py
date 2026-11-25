@@ -1,8 +1,8 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
-
-from courses.models import Course
+from courses.models import Course, Lesson, LessonProgress, Module
+from enrollments.models import Enrollment
 from .models import Review
 
 
@@ -118,3 +118,233 @@ class CourseRatingDisplayTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 404)
+
+
+class ReviewSubmissionTests(TestCase):
+    def setUp(self):
+        self.instructor = User.objects.create_user(
+            username="review_instructor",
+            password="testpass123",
+            role=User.Role.INSTRUCTOR,
+        )
+        self.student = User.objects.create_user(
+            username="review_student",
+            password="testpass123",
+            role=User.Role.STUDENT,
+        )
+        self.other_student = User.objects.create_user(
+            username="other_student",
+            password="testpass123",
+            role=User.Role.STUDENT,
+        )
+
+        self.course = Course.objects.create(
+            title="Django Fundamentals",
+            instructor=self.instructor,
+            description="An introductory Django course.",
+            status=Course.Status.PUBLISHED,
+        )
+
+        self.module = Module.objects.create(
+            course=self.course,
+            title="Introduction",
+            order=1,
+        )
+
+        # Four lessons make the 50% threshold easy to test:
+        # 1 completed = 25%, 2 completed = 50%.
+        self.lessons = [
+            Lesson.objects.create(
+                module=self.module,
+                title=f"Lesson {number}",
+                order=number,
+            )
+            for number in range(1, 5)
+        ]
+
+        Enrollment.objects.create(
+            student=self.student,
+            course=self.course,
+        )
+
+        # Expected endpoint:
+        # path("course/<int:course_id>/review/", ..., name="create_review")
+        self.review_url = reverse(
+            "reviews:create_review",
+            kwargs={"course_id": self.course.pk},
+        )
+
+        self.outline_url = reverse(
+            "courses:outline",
+            args=[self.course.pk],
+        )
+
+    def complete_lessons(self, count):
+        for lesson in self.lessons[:count]:
+            LessonProgress.objects.create(
+                student=self.student,
+                lesson=lesson,
+            )
+
+    def submit_review(self, rating=5, comment="Excellent course"):
+        return self.client.post(
+            self.review_url,
+            {
+                "rating": rating,
+                "comment": comment,
+            },
+        )
+
+    def test_student_can_submit_review_at_exactly_50_percent(self):
+        self.client.login(
+            username="review_student",
+            password="testpass123",
+        )
+        self.complete_lessons(2)
+
+        response = self.submit_review(
+            rating=5,
+            comment="Very useful course.",
+        )
+
+        self.assertRedirects(response, self.outline_url)
+
+        review = Review.objects.get(
+            course=self.course,
+            student=self.student,
+        )
+        self.assertEqual(review.rating, 5)
+        self.assertEqual(review.comment, "Very useful course.")
+
+    def test_student_can_submit_review_above_50_percent(self):
+        self.client.login(
+            username="review_student",
+            password="testpass123",
+        )
+        self.complete_lessons(3)
+
+        response = self.submit_review()
+
+        self.assertRedirects(response, self.outline_url)
+        self.assertTrue(
+            Review.objects.filter(
+                course=self.course,
+                student=self.student,
+            ).exists()
+        )
+
+    def test_student_cannot_submit_review_below_50_percent(self):
+        self.client.login(
+            username="review_student",
+            password="testpass123",
+        )
+        self.complete_lessons(1)
+
+        response = self.submit_review()
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(
+            Review.objects.filter(
+                course=self.course,
+                student=self.student,
+            ).exists()
+        )
+
+    def test_student_cannot_review_without_enrollment(self):
+        self.client.login(
+            username="other_student",
+            password="testpass123",
+        )
+
+        # Even completing lessons must not bypass enrollment.
+        self.complete_lessons(0)
+
+        response = self.submit_review()
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(
+            Review.objects.filter(
+                course=self.course,
+                student=self.other_student,
+            ).exists()
+        )
+
+    def test_instructor_cannot_submit_review_for_own_course(self):
+        self.client.login(
+            username="review_instructor",
+            password="testpass123",
+        )
+
+        response = self.submit_review()
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(
+            Review.objects.filter(
+                course=self.course,
+                student=self.instructor,
+            ).exists()
+        )
+
+    def test_anonymous_user_is_redirected_to_login(self):
+        response = self.submit_review()
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/login/", response.url)
+        self.assertFalse(Review.objects.exists())
+
+    def test_invalid_rating_does_not_create_review(self):
+        self.client.login(
+            username="review_student",
+            password="testpass123",
+        )
+        self.complete_lessons(2)
+
+        for invalid_rating in (0, 6, "invalid"):
+            with self.subTest(rating=invalid_rating):
+                response = self.submit_review(
+                    rating=invalid_rating,
+                    comment="Invalid rating test",
+                )
+
+                self.assertNotEqual(response.status_code, 302)
+                self.assertFalse(
+                    Review.objects.filter(
+                        course=self.course,
+                        student=self.student,
+                    ).exists()
+                )
+
+    def test_student_cannot_submit_duplicate_review(self):
+        self.client.login(
+            username="review_student",
+            password="testpass123",
+        )
+        self.complete_lessons(2)
+
+        Review.objects.create(
+            course=self.course,
+            student=self.student,
+            rating=4,
+            comment="My first review.",
+        )
+
+        response = self.submit_review(
+            rating=5,
+            comment="Trying to submit another review.",
+        )
+
+        self.assertEqual(
+            Review.objects.filter(
+                course=self.course,
+                student=self.student,
+            ).count(),
+            1,
+        )
+
+        # The duplicate must not replace the original review.
+        review = Review.objects.get(
+            course=self.course,
+            student=self.student,
+        )
+        self.assertEqual(review.rating, 4)
+        self.assertEqual(review.comment, "My first review.")
