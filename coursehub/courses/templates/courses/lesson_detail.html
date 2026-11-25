@@ -34,7 +34,7 @@
                                     <li
                                         class="list-group-item {% if lsn == lesson %}active bg-primary text-white{% endif %}">
                                         <a href="{% url 'courses:lesson_view' lsn.id %}"
-                                            class="text-decoration-none {% if lsn == lesson %}text-white{% else %}text-dark{% endif %}">
+                                            class="stretched-link text-decoration-none {% if lsn == lesson %}text-white{% else %}text-dark{% endif %}">
                                             {{ lsn.title }}
                                         </a>
                                     </li>
@@ -111,7 +111,7 @@
                             </button>
                         {% else %}
                             <button id="complete-btn"
-                                    data-url="{% url 'courses:complete_lesson' lesson.pk %}"
+                                    data-url="{% url 'courses_api:complete_lesson' lesson.pk %}"
                                     data-id="{{ lesson.pk }}"
                                     class="btn btn-success">
                                 Mark as Complete
@@ -149,25 +149,38 @@
         }
         
         if (completeBtn) {
+
             completeBtn.addEventListener("click", async (e) => {
                 const btn = e.currentTarget;
-                const res = await fetch(btn.dataset.url, {
-                    method: "POST",
-                    headers: { "X-CSRFToken": csrftoken }
-                });
-                if (!res.ok) {
-                    document.getElementById("error-message").style.display = "block";
-                    setTimeout(() => {
-                        document.getElementById("error-message").style.display = "none";
-                    }, 3000);
+                const errorBox = document.getElementById("error-message");
+                const showError = () => {
+                    btn.disabled = false;
+                    errorBox.style.display = "block";
+                    setTimeout(() => { errorBox.style.display = "none"; }, 3000);
+                };
+                
+                btn.disabled = true;
+                let data;
+                try {
+                    const res = await fetch(btn.dataset.url, {
+                        method: "POST",
+                        headers: { "X-CSRFToken": csrftoken }
+                    });
+                    if (!res.ok) {
+                        showError();
+                        return;
+                    }
+                    data = await res.json();
+                } catch (error) {
+                    showError();    
                     return;
                 }
-                const data = await res.json();
 
                 const lessonTitle = document.querySelector("#lesson-" + data.lesson);
-                if (lessonTitle) {
+                if (lessonTitle && !lessonTitle.textContent.startsWith("✅")) {
                     lessonTitle.textContent = "✅ " + lessonTitle.textContent;
                 }
+
 
                 if (progressBar && progressPercent) {
                     progressBar.style.width = data.percent + "%";
@@ -176,7 +189,6 @@
                     progressPercent.textContent = data.percent + "%";
                 }
 
-                btn.disabled = true;
                 btn.textContent = "Completed ✓";
             });
         }
