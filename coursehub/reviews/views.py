@@ -2,6 +2,7 @@ from django.shortcuts import render
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
+from django.db import IntegrityError, transaction
 from django.shortcuts import get_object_or_404, redirect
 from django.views.decorators.http import require_POST
 
@@ -56,7 +57,20 @@ def create_review(request, course_id):
         review = form.save(commit=False)
         review.student = request.user
         review.course = course
-        review.save()
+        try:
+            with transaction.atomic():
+                review.save()
+        except IntegrityError:
+            if Review.objects.filter(
+                student=request.user,
+                course=course,
+            ).exists():
+                messages.warning(
+                    request,
+                    "You have already reviewed this course.",
+                )
+                return redirect("courses:outline", pk=course.pk)
+            raise
 
         messages.success(request, "Your review was submitted successfully!")
     else:

@@ -1,3 +1,7 @@
+from unittest.mock import patch
+
+from django.contrib.messages import get_messages
+from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
@@ -440,6 +444,35 @@ class ReviewSubmissionTests(TestCase):
                 student=self.student,
             ).count(),
             1,
+        )
+
+    def test_concurrent_duplicate_review_is_handled_safely(self):
+        self.complete_one_lesson()
+        self.client.force_login(self.student)
+
+        with (
+            patch("reviews.views.Review.objects.filter") as filter_mock,
+            patch(
+                "reviews.views.Review.save",
+                side_effect=IntegrityError("unique constraint"),
+            ),
+        ):
+            # First check: no review exists.
+            # Second check: a competing submission created one.
+            filter_mock.return_value.exists.side_effect = [False, True]
+
+            response = self.client.post(
+                self.review_url,
+                {"rating": 5, "comment": "Good course."},
+            )
+
+        self.assertRedirects(response, self.outline_url)
+        messages_list = list(get_messages(response.wsgi_request))
+        self.assertTrue(
+            any(
+                str(message) == "You have already reviewed this course."
+                for message in messages_list
+            )
         )
 
     def test_invalid_rating_is_rejected(self):
