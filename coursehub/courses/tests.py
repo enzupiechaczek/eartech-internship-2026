@@ -2173,6 +2173,7 @@ class CourseListFeatureTests(TestCase):
             price=50,
             status=Course.Status.DRAFT,
         )
+
     def test_category_filter_returns_only_selected_category(self):
         response = self.client.get(
             reverse("courses:list"),
@@ -2242,6 +2243,3 @@ class CourseListFeatureTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["page_obj"].number, 2)
         self.assertEqual(len(response.context["page_obj"]), 1)
-
-
-
