@@ -16,7 +16,8 @@ from django.views.generic import ListView
 
 from accounts.decorators import InstructorRequiredMixin, instructor_required
 from enrollments.models import Enrollment
-
+from reviews.forms import ReviewForm
+from reviews.models import Review
 from .forms import CourseForm, LessonForm, ModuleForm
 from .models import Category, Course, Lesson, LessonProgress, Module
 
@@ -128,6 +129,35 @@ def course_outline(request, pk):
         ).exists()
     )
 
+    is_student = (
+        request.user.is_authenticated
+        and request.user.role == request.user.Role.STUDENT
+    )
+
+    completion_percent = (
+        course.get_completion_percentage(request.user)
+        if is_student and is_enrolled
+        else 0
+    )
+
+    has_reviewed = (
+        Review.objects.filter(
+            student=request.user,
+            course=course,
+        ).exists()
+        if is_student and is_enrolled
+        else False
+    )
+
+    is_review_eligible = (
+        is_student
+        and is_enrolled
+        and course.has_completed_at_least(request.user, 50)
+        and not has_reviewed
+    )
+
+    review_form = ReviewForm() if is_review_eligible else None
+
     return render(
         request,
         "courses/course_outline.html",
@@ -142,6 +172,10 @@ def course_outline(request, pk):
             "average_rating": course.average_rating,
             "review_count": course.review_count,
             "reviews": reviews,
+            "completion_percent": completion_percent,
+            "has_reviewed": has_reviewed,
+            "is_review_eligible": is_review_eligible,
+            "review_form": review_form,
         },
     )
 

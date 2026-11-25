@@ -34,10 +34,8 @@ def create_review(request, course_id):
     if not is_enrolled:
         raise PermissionDenied
 
-    # Verify actual course progress.
-    progress = course.get_completion_percentage(request.user)
-
-    if progress < 50:
+    # Verify exact course completion (at least 50%).
+    if not course.has_completed_at_least(request.user, 50):
         messages.error(
             request,
             "You must complete at least 50% of the course to submit a review.",
