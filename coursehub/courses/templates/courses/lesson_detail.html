@@ -104,28 +104,30 @@
 
                     <hr>
 
-                    {% if is_enrolled and not is_instructor %}
-                        {% if is_lesson_completed %}
-                            <button class="btn btn-success" disabled>
-                                Completed ✓
-                            </button>
-                        {% else %}
-                            <button id="complete-btn"
-                                    data-url="{% url 'courses_api:complete_lesson' lesson.pk %}"
-                                    data-id="{{ lesson.pk }}"
-                                    class="btn btn-success">
-                                Mark as Complete
-                            </button>
+                    <div class="d-flex flex-wrap gap-2">
+                        {% if is_enrolled and not is_instructor %}
+                            {% if is_lesson_completed %}
+                                <button class="btn btn-success" disabled>
+                                    Completed ✓
+                                </button>
+                            {% else %}
+                                <button id="complete-btn"
+                                        data-url="{% url 'courses_api:complete_lesson' lesson.pk %}"
+                                        data-id="{{ lesson.pk }}"
+                                        class="btn btn-success">
+                                    Mark as Complete
+                                </button>
+                            {% endif %}
                         {% endif %}
-                    {% endif %}
 
-                    <div id="error-message" class="alert alert-danger" style="display: none; margin-top: 10px;">
-                        Could not save progress
+                        <a href="{% url 'courses:outline' course.id %}" class="btn btn-outline-secondary">
+                            Back to Course Outline
+                        </a>
                     </div>
 
-                    <a href="{% url 'courses:outline' course.id %}" class="btn btn-outline-secondary">
-                        Back to Course Outline
-                    </a>
+                    <div id="error-message" class="alert alert-danger mt-3 mb-0" style="display: none;">
+                        Could not save progress
+                    </div>
                 </div>
             </div>
         </div>
