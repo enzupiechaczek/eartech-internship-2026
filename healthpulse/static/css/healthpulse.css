@@ -86,7 +86,7 @@ h3 { font-size: 1rem; font-weight: 600; color: var(--hp-ink); }
 .hp-split__side { flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 24px; }
 .hp-back { display: inline-block; margin-bottom: 18px; font-weight: 500; text-decoration: none; }
 
-/* ---------- Cards ---------- */
+/*.hp-table-wrap { ---------- Cards ---------- */
 .hp-card, .card {
   background: var(--hp-beige-50); border: 1px solid var(--hp-line); border-radius: var(--hp-radius);
 }
@@ -371,3 +371,9 @@ h3 { font-size: 1rem; font-weight: 600; color: var(--hp-ink); }
 }
 .hp-choice:has(input:checked) { border-color: var(--hp-teal-700); background: var(--hp-teal-100); color: var(--hp-teal-800); }
 .hp-choice-group.has-error .hp-choice { border-color: var(--hp-brick-ink); }
+/* Responsive tables */
+.hp-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
