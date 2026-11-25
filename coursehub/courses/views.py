@@ -205,7 +205,15 @@ def home(request):
         )
         .order_by("-created_at")[:8]
     )
-    return render(request, "home.html", {"courses": courses})
+
+    popular_courses = (
+        Course.objects.filter(status=Course.Status.PUBLISHED)
+        .select_related("instructor", "category")
+        .annotate(attendee_count=Count("enrollments", distinct=True))
+        .order_by("-attendee_count", "-created_at")[:8]
+    )
+
+    return render(request, "home.html", {"courses": courses, "popular_courses": popular_courses})
 
 
 def about(request):
