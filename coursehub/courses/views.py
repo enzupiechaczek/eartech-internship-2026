@@ -400,7 +400,6 @@ def toggle_publish(request, pk):
     return redirect("studio")
 
 
-@login_required
 @require_POST
 def complete_lesson(request, lesson_id):
     """Mark a lesson as complete via AJAX."""
