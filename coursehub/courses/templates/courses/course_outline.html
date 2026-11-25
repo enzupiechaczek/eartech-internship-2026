@@ -69,13 +69,9 @@
                 {% if module.lessons.all %}
                     <ol class="outline-lessons">
                         {% for lesson in module.lessons.all %}
-                            <!-- <li class="outline-lesson">
+                            <li class="outline-lesson">
                                 <span class="outline-lesson-index">{{ forloop.counter }}</span>
                                 <span class="outline-lesson-title">{{ lesson.title }}</span>
-                            </li> -->
-                            <li class="list-group-item">
-                                <a href="{% url 'courses:lesson_view' lesson.id %}"
-                                class="text-decoration-none text-dark">{{ lesson.title }}</a>
                             </li>
                         {% endfor %}
                     </ol>

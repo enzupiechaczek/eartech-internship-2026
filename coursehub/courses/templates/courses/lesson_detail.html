@@ -148,50 +148,50 @@
             progressPercent.textContent = initialPercent + "%";
         }
         
-  
-        completeBtn.addEventListener("click", async (e) => {
-            const btn = e.currentTarget;
-            const errorBox = document.getElementById("error-message");
-            const showError = () => {
-                btn.disabled = false;
-                errorBox.style.display = "block";
-                setTimeout(() => { errorBox.style.display = "none"; }, 3000);
-            };
-            
-            btn.disabled = true;
-            let data;
-            try {
-                const res = await fetch(btn.dataset.url, {
-                    method: "POST",
-                    headers: { "X-CSRFToken": csrftoken }
-                });
-                if (!res.ok) {
-                    showError();
+        if (completeBtn) {
+
+            completeBtn.addEventListener("click", async (e) => {
+                const btn = e.currentTarget;
+                const errorBox = document.getElementById("error-message");
+                const showError = () => {
+                    btn.disabled = false;
+                    errorBox.style.display = "block";
+                    setTimeout(() => { errorBox.style.display = "none"; }, 3000);
+                };
+                
+                btn.disabled = true;
+                let data;
+                try {
+                    const res = await fetch(btn.dataset.url, {
+                        method: "POST",
+                        headers: { "X-CSRFToken": csrftoken }
+                    });
+                    if (!res.ok) {
+                        showError();
+                        return;
+                    }
+                    data = await res.json();
+                } catch (error) {
+                    showError();    
                     return;
                 }
-                data = await res.json();
-            } catch (error) {
-                showError();    
-                return;
-            }
 
-            const lessonTitle = document.querySelector("#lesson-" + data.lesson);
-            if (lessonTitle && !lessonTitle.textContent.startsWith("✅")) {
-                lessonTitle.textContent = "✅ " + lessonTitle.textContent;
-            }
+                const lessonTitle = document.querySelector("#lesson-" + data.lesson);
+                if (lessonTitle && !lessonTitle.textContent.startsWith("✅")) {
+                    lessonTitle.textContent = "✅ " + lessonTitle.textContent;
+                }
 
 
-            if (progressBar && progressPercent) {
-                progressBar.style.width = data.percent + "%";
-                progressBar.textContent = data.percent + "%";
-                progressBar.setAttribute("aria-valuenow", data.percent);
-                progressPercent.textContent = data.percent + "%";
-            }
+                if (progressBar && progressPercent) {
+                    progressBar.style.width = data.percent + "%";
+                    progressBar.textContent = data.percent + "%";
+                    progressBar.setAttribute("aria-valuenow", data.percent);
+                    progressPercent.textContent = data.percent + "%";
+                }
 
-            // btn.disabled = true;
-            btn.textContent = "Completed ✓";
-        });
-    
+                btn.textContent = "Completed ✓";
+            });
+        }
     </script>
 {% endif %}
 
