@@ -247,3 +247,47 @@ class RegistrationFormTests(TestCase):
 
         self.assertFalse(form.is_valid())
         self.assertIn('role', form.errors)
+
+    def test_duplicate_email_is_rejected(self):
+        User.objects.create_user(
+            username='existingstudent',
+            email='existing@test.com',
+            password='StrongPass123!',
+        )
+
+        form = RegisterForm(data={
+            'username': 'newstudent',
+            'email': 'EXISTING@test.com',
+            'role': User.Role.STUDENT,
+            'password1': 'StrongPass123!',
+            'password2': 'StrongPass123!',
+        })
+
+        self.assertFalse(form.is_valid())
+        self.assertIn('email', form.errors)
+
+    def test_duplicate_username_is_rejected(self):
+        User.objects.create_user(
+            username='existingstudent',
+            email='existing@test.com',
+            password='StrongPass123!',
+        )
+
+        form = RegisterForm(data={
+            'username': 'existingstudent',
+            'email': 'new@test.com',
+            'role': User.Role.STUDENT,
+            'password1': 'StrongPass123!',
+            'password2': 'StrongPass123!',
+        })
+
+        self.assertFalse(form.is_valid())
+        self.assertIn('username', form.errors)
+
+    def test_missing_required_fields_are_rejected(self):
+        form = RegisterForm(data={})
+
+        self.assertFalse(form.is_valid())
+
+        for field in ['username', 'email', 'password1', 'password2']:
+            self.assertIn(field, form.errors)
