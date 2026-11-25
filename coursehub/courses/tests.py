@@ -2,6 +2,7 @@ import io
 import os
 import shutil
 import tempfile
+from datetime import timedelta
 from decimal import Decimal
 from urllib.parse import parse_qs, urlparse
 
@@ -10,8 +11,8 @@ from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 from PIL import Image
-
 
 from enrollments.models import Enrollment
 
@@ -341,7 +342,71 @@ class HomeViewTests(TestCase):
         response = self.client.get(reverse("home"))
         self.assertContains(response, "No courses yet.")
 
+    def create_popular_test_course(self, title, status=Course.Status.PUBLISHED):
+        return Course.objects.create(
+            title=title,
+            description="Test course",
+            instructor=self.omar,
+            status=status,
+        )
 
+    def add_test_enrollments(self, course, count, prefix):
+        for i in range(count):
+            student = get_user_model().objects.create_user(
+                username=f"{prefix}_{i}",
+                password="pass",
+            )
+            Enrollment.objects.create(student=student, course=course)
+
+    def test_popular_courses_order_by_enrollment_count_and_creation_date(self):
+        popular = self.create_popular_test_course("Most Popular")
+        older_tie = self.create_popular_test_course("Older Tie")
+        newer_tie = self.create_popular_test_course("Newer Tie")
+
+        self.add_test_enrollments(popular, 2, "popular_student")
+        self.add_test_enrollments(older_tie, 1, "older_student")
+        self.add_test_enrollments(newer_tie, 1, "newer_student")
+
+        now = timezone.now()
+        Course.objects.filter(pk=older_tie.pk).update(
+            created_at=now - timedelta(days=2)
+        )
+        Course.objects.filter(pk=newer_tie.pk).update(
+            created_at=now - timedelta(days=1)
+        )
+
+        response = self.client.get(reverse("home"))
+        popular_titles = [
+            course.title
+            for course in response.context["popular_courses"]
+        ]
+
+        self.assertEqual(
+            popular_titles,
+            ["Most Popular", "Newer Tie", "Older Tie"],
+        )
+
+    def test_popular_courses_exclude_drafts_and_limit_to_eight(self):
+        for i in range(9):
+            self.create_popular_test_course(f"Published Course {i}")
+
+        draft = self.create_popular_test_course(
+            "Highly Enrolled Draft",
+            status=Course.Status.DRAFT,
+        )
+        self.add_test_enrollments(draft, 10, "draft_student")
+
+        response = self.client.get(reverse("home"))
+        popular_courses = response.context["popular_courses"]
+
+        self.assertEqual(len(popular_courses), 8)
+        self.assertTrue(
+            all(
+                course.status == Course.Status.PUBLISHED
+                for course in popular_courses
+            )
+        )
+        self.assertNotIn(draft, popular_courses)
 
 class CourseCurriculumTests(TestCase):
 

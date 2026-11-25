@@ -103,6 +103,50 @@
         {% empty %}
             <p>No student reviews yet.</p>
         {% endfor %}
+
+        {% if is_review_eligible %}
+            <div class="outline-review-form">
+                <h3>Share your experience</h3>
+                <p>
+                    You have completed {{ completion_percent }}% of this course.
+                    Share your feedback with other students.
+                </p>
+
+                <form method="post"
+                      action="{% url 'reviews:create' course.id %}">
+                    {% csrf_token %}
+
+                    <div class="mb-3">
+                        <label for="{{ review_form.rating.id_for_label }}">
+                            Your rating
+                        </label>
+                        {{ review_form.rating }}
+                        {{ review_form.rating.errors }}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="{{ review_form.comment.id_for_label }}">
+                            Your comment (optional)
+                        </label>
+                        {{ review_form.comment }}
+                        {{ review_form.comment.errors }}
+                    </div>
+
+                    <button type="submit" class="home-btn home-btn-primary">
+                        Submit Review
+                    </button>
+                </form>
+            </div>
+
+        {% elif has_reviewed %}
+            <p>You have already reviewed this course. Thank you for your feedback!</p>
+
+        {% elif is_enrolled and user.role == "STUDENT" %}
+            <p>
+                Complete at least 50% of this course to unlock the review form.
+                Your current progress is {{ completion_percent }}%.
+            </p>
+        {% endif %}
     </section>
 
     <aside class="outline-cta">
