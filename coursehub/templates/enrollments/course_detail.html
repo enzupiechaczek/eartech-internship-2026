@@ -32,13 +32,11 @@
 
                 {% for lesson in module.lessons.all %}
 
-                    <div class="border-bottom py-2">
-                        <li class="list-group-item lesson-item">
+                    <div class="border-bottom py-2 lesson-item position-relative">
                             <a href="{% url 'courses:lesson_view' lesson.id %}"
                             class="lesson-link stretched-link text-decoration-none text-dark">
                                 {{ lesson.title }}
                             </a>
-                        </li>
                     </div>
 
                 {% empty %}
