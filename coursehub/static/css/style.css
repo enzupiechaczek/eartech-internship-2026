@@ -1022,16 +1022,3 @@ body {
         width: 100%;
     }
 }
-/* .lesson-link {
-    transition: color 0.15s ease;
-}
-
-.lesson-link:hover,
-.lesson-link:focus-visible {
-    color: var(--bs-primary) !important;
-    text-decoration: underline !important;
-}
-
-.lesson-item:hover {
-    background-color: var(--bs-light);
-} */
