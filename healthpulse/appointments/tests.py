@@ -10,6 +10,95 @@ from core.models import DoctorProfile, PatientProfile
 from .models import Appointment
 
 
+class AppointmentStatusTransitionTests(TestCase):
+    def setUp(self):
+        self.doctor_user = User.objects.create_user(
+            'status-doctor',
+            password='pw-test-123',
+            role=User.Role.DOCTOR,
+        )
+        self.patient_user = User.objects.create_user(
+            'status-patient',
+            password='pw-test-123',
+            role=User.Role.PATIENT,
+        )
+        self.doctor = DoctorProfile.objects.create(user=self.doctor_user)
+        self.patient = PatientProfile.objects.create(user=self.patient_user)
+
+    def create_appointment(self, status=None):
+        appointment_fields = {
+            'patient': self.patient,
+            'doctor': self.doctor,
+            'appointment_date': timezone.localdate() + timedelta(days=1),
+            'time_slot': time(10, 0),
+            'reason_for_visit': 'Status transition test',
+        }
+        if status is not None:
+            appointment_fields['status'] = status
+        return Appointment.objects.create(**appointment_fields)
+
+    def update_status(self, appointment, status):
+        self.client.force_login(self.doctor_user)
+        return self.client.post(
+            reverse('update_appointment_status', kwargs={'pk': appointment.pk}),
+            data={'status': status},
+            content_type='application/json',
+        )
+
+    def test_new_appointment_defaults_to_pending(self):
+        appointment = self.create_appointment()
+
+        self.assertEqual(appointment.status, Appointment.Status.PENDING)
+
+    def test_pending_appointment_can_be_approved_and_status_is_persisted(self):
+        appointment = self.create_appointment()
+
+        response = self.update_status(
+            appointment,
+            Appointment.Status.APPROVED,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        appointment.refresh_from_db()
+        self.assertEqual(appointment.status, Appointment.Status.APPROVED)
+
+    def test_pending_appointment_can_be_rejected_and_status_is_persisted(self):
+        appointment = self.create_appointment()
+
+        response = self.update_status(
+            appointment,
+            Appointment.Status.REJECTED,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        appointment.refresh_from_db()
+        self.assertEqual(appointment.status, Appointment.Status.REJECTED)
+
+    def test_pending_appointment_cannot_transition_to_in_visit(self):
+        appointment = self.create_appointment()
+
+        response = self.update_status(
+            appointment,
+            Appointment.Status.IN_VISIT,
+        )
+
+        self.assertEqual(response.status_code, 400)
+        appointment.refresh_from_db()
+        self.assertEqual(appointment.status, Appointment.Status.PENDING)
+
+    def test_non_pending_appointment_cannot_transition_to_rejected(self):
+        appointment = self.create_appointment(Appointment.Status.APPROVED)
+
+        response = self.update_status(
+            appointment,
+            Appointment.Status.REJECTED,
+        )
+
+        self.assertEqual(response.status_code, 400)
+        appointment.refresh_from_db()
+        self.assertEqual(appointment.status, Appointment.Status.APPROVED)
+
+
 class PendingRequestsTests(TestCase):
     def setUp(self):
         self.smith = User.objects.create_user('smith', password='pw-test-123', role=User.Role.DOCTOR)
@@ -82,6 +171,30 @@ class BookingAndExpiryTests(TestCase):
 
         self.assertContains(page, f'min="{timezone.localdate().isoformat()}"')
         self.assertContains(response, 'Appointment requested for')
+
+    def test_patient_without_profile_is_redirected_safely(self):
+        user = User.objects.create_user(
+            "missing-profile",
+            password="pw-test-123",
+            role=User.Role.PATIENT,
+        )
+        PatientProfile.objects.filter(user=user).delete()
+        self.client.force_login(user)
+
+        url = reverse(
+            "book_appointment",
+            kwargs={"doctor_id": self.doctor.pk},
+        )
+        response = self.client.post(url, {
+            "appointment_date": (
+                timezone.localdate() + timedelta(days=2)
+            ).isoformat(),
+            "time_slot": "10:00",
+            "reason_for_visit": "Check-up",
+        })
+
+        self.assertRedirects(response, reverse("patient_dashboard"))
+        self.assertFalse(Appointment.objects.filter(patient__user=user).exists())
 
     def test_past_pending_request_is_expired_and_cannot_be_approved(self):
         appt = Appointment.objects.create(

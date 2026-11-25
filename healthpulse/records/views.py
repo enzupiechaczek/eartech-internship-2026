@@ -5,7 +5,7 @@ from django.utils.dateformat import format as date_format
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
-from django.db.models import Prefetch
+from django.db.models import Prefetch , Q
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
@@ -468,7 +468,13 @@ def medical_file_upload(request, patient_id):
 @patient_required
 def medical_history(request):
     """Patient-facing timeline of their own completed visits."""
-    patient = get_object_or_404(PatientProfile, user=request.user)
+    patient = getattr(request.user, "patientprofile", None)
+    if patient is None:
+        messages.error(
+            request,
+            "Your patient profile is missing. Please contact support.",
+        )
+        return redirect("patient_dashboard")
 
     encounters = (
         ClinicalEncounter.objects.filter(
@@ -499,8 +505,26 @@ def medical_history(request):
 @doctor_required
 def my_patients(request):
     doc = request.user.doctorprofile
+
     patients = PatientProfile.objects.filter(
         appointments__doctor=doc,
         appointments__status__in=["APPROVED", "COMPLETED"],
     ).select_related("user").distinct()
-    return render(request, "records/my_patients.html", {"patients": patients})
+
+    q = request.GET.get("q", "").strip()
+
+    if q:
+        patients = patients.filter(
+            Q(user__first_name__icontains=q)
+            | Q(user__last_name__icontains=q)
+            | Q(encounters__diagnosis__icontains=q, encounters__doctor=doc)
+        ).distinct()
+
+    return render(
+        request,
+        "records/my_patients.html",
+        {
+            "patients": patients,
+            "q": q,
+        },
+    )

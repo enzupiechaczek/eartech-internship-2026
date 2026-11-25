@@ -28,12 +28,20 @@ def pending_requests(request):
 @patient_required
 def book(request, doctor_id):
     doctor = get_object_or_404(DoctorProfile, pk=doctor_id)
+    patient_profile = getattr(request.user, "patientprofile", None)
+
+    if patient_profile is None:
+        messages.error(
+            request,
+            "Your patient profile is missing. Please contact support.",
+        )
+        return redirect("patient_dashboard")
 
     form = BookingForm(request.POST or None)
 
     if request.method == "POST" and form.is_valid():
         appt = form.save(commit=False)
-        appt.patient = request.user.patientprofile
+        appt.patient = patient_profile
         appt.doctor = doctor
         appt.status = Appointment.Status.PENDING
         appt.save()

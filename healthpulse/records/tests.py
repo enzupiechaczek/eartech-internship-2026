@@ -11,7 +11,6 @@ from .permissions import has_relationship, require_relationship
 import tempfile
 from django.core.files.uploadedfile import SimpleUploadedFile
 
-
 User = get_user_model()
 
 
@@ -20,25 +19,19 @@ class DoctorPatientRelationshipTests(TestCase):
     def setUp(self):
         # Create doctor user
         self.doctor_user = User.objects.create_user(
-            username="doctor1",
-            password="test123"
+            username="doctor1", password="test123"
         )
         self.doctor_user.role = User.Role.DOCTOR
         self.doctor_user.save()
 
-        self.doctor = DoctorProfile.objects.create(
-            user=self.doctor_user
-        )
+        self.doctor = DoctorProfile.objects.create(user=self.doctor_user)
 
         # Create patient user
         self.patient_user = User.objects.create_user(
-            username="patient1",
-            password="test123"
+            username="patient1", password="test123"
         )
 
-        self.patient = PatientProfile.objects.create(
-            user=self.patient_user
-        )
+        self.patient = PatientProfile.objects.create(user=self.patient_user)
 
     def create_appointment(self, status):
         return Appointment.objects.create(
@@ -52,47 +45,51 @@ class DoctorPatientRelationshipTests(TestCase):
 
     # Allowed statuses
 
-    def test_approved_appointment_allows_relationship(self):
+    def test_approved_authorizes(self):
         self.create_appointment(Appointment.Status.APPROVED)
 
-        self.assertTrue(
-            has_relationship(self.doctor, self.patient)
-        )
+        self.assertTrue(has_relationship(self.doctor, self.patient))
 
     def test_in_visit_appointment_allows_relationship(self):
         self.create_appointment(Appointment.Status.IN_VISIT)
 
-        self.assertTrue(
-            has_relationship(self.doctor, self.patient)
-        )
+        self.assertTrue(has_relationship(self.doctor, self.patient))
 
     def test_completed_appointment_allows_relationship(self):
         self.create_appointment(Appointment.Status.COMPLETED)
 
-        self.assertTrue(
-            has_relationship(self.doctor, self.patient)
-        )
+        self.assertTrue(has_relationship(self.doctor, self.patient))
 
     # Rejected statuses
 
-    def test_pending_appointment_denies_relationship(self):
+    def test_pending_does_not_authorize(self):
         self.create_appointment(Appointment.Status.PENDING)
 
-        self.assertFalse(
-            has_relationship(self.doctor, self.patient)
-        )
+        self.assertFalse(has_relationship(self.doctor, self.patient))
 
     def test_rejected_appointment_denies_relationship(self):
         self.create_appointment(Appointment.Status.REJECTED)
 
-        self.assertFalse(
-            has_relationship(self.doctor, self.patient)
-        )
+        self.assertFalse(has_relationship(self.doctor, self.patient))
 
     def test_no_appointment_denies_relationship(self):
-        self.assertFalse(
-            has_relationship(self.doctor, self.patient)
+        self.assertFalse(has_relationship(self.doctor, self.patient))
+
+    def test_appointment_for_different_doctor_patient_pair_denies_relationship(self):
+        other_doctor_user = User.objects.create_user(
+            username="doctor2",
+            password="test123",
         )
+        other_doctor = DoctorProfile.objects.create(user=other_doctor_user)
+        self.create_appointment(Appointment.Status.APPROVED)
+
+        self.assertFalse(has_relationship(other_doctor, self.patient))
+
+    def test_any_approved_appointment_authorizes_among_multiple_appointments(self):
+        self.create_appointment(Appointment.Status.PENDING)
+        self.create_appointment(Appointment.Status.APPROVED)
+
+        self.assertTrue(has_relationship(self.doctor, self.patient))
 
     # require_relationship tests
 
@@ -115,10 +112,7 @@ class DoctorPatientRelationshipTests(TestCase):
         self.client.force_login(self.doctor_user)
 
         response = self.client.get(
-            reverse(
-                "patient_medical_chart",
-                kwargs={"patient_id": self.patient.id}
-            )
+            reverse("patient_medical_chart", kwargs={"patient_id": self.patient.id})
         )
 
         self.assertEqual(response.status_code, 200)
@@ -127,10 +121,7 @@ class DoctorPatientRelationshipTests(TestCase):
         self.client.force_login(self.doctor_user)
 
         response = self.client.get(
-            reverse(
-                "patient_medical_chart",
-                kwargs={"patient_id": self.patient.id}
-            )
+            reverse("patient_medical_chart", kwargs={"patient_id": self.patient.id})
         )
 
         self.assertEqual(response.status_code, 403)
@@ -139,20 +130,14 @@ class DoctorPatientRelationshipTests(TestCase):
         self.client.force_login(self.patient_user)
 
         response = self.client.get(
-            reverse(
-                "patient_medical_chart",
-                kwargs={"patient_id": self.patient.id}
-            )
+            reverse("patient_medical_chart", kwargs={"patient_id": self.patient.id})
         )
         self.assertEqual(response.status_code, 403)
-
 
     # Encounter detail view tests
 
     def test_authorized_doctor_can_access_encounter_detail(self):
-        appointment = self.create_appointment(
-            Appointment.Status.APPROVED
-        )
+        appointment = self.create_appointment(Appointment.Status.APPROVED)
 
         encounter = ClinicalEncounter.objects.create(
             appointment=appointment,
@@ -166,18 +151,13 @@ class DoctorPatientRelationshipTests(TestCase):
         self.client.force_login(self.doctor_user)
 
         response = self.client.get(
-            reverse(
-                "encounter_detail",
-                kwargs={"encounter_id": encounter.id}
-            )
+            reverse("encounter_detail", kwargs={"encounter_id": encounter.id})
         )
 
         self.assertEqual(response.status_code, 200)
 
     def test_unauthorized_doctor_gets_403_for_encounter_detail(self):
-        appointment = self.create_appointment(
-            Appointment.Status.PENDING
-        )
+        appointment = self.create_appointment(Appointment.Status.PENDING)
 
         encounter = ClinicalEncounter.objects.create(
             appointment=appointment,
@@ -191,10 +171,7 @@ class DoctorPatientRelationshipTests(TestCase):
         self.client.force_login(self.doctor_user)
 
         response = self.client.get(
-            reverse(
-                "encounter_detail",
-                kwargs={"encounter_id": encounter.id}
-            )
+            reverse("encounter_detail", kwargs={"encounter_id": encounter.id})
         )
 
         self.assertEqual(response.status_code, 403)
@@ -202,9 +179,7 @@ class DoctorPatientRelationshipTests(TestCase):
     # Doctor ownership test
 
     def test_doctor_cannot_access_another_doctors_encounter(self):
-        appointment = self.create_appointment(
-            Appointment.Status.APPROVED
-        )
+        appointment = self.create_appointment(Appointment.Status.APPROVED)
 
         encounter = ClinicalEncounter.objects.create(
             appointment=appointment,
@@ -215,10 +190,7 @@ class DoctorPatientRelationshipTests(TestCase):
             treatment_notes="Rest and follow-up",
         )
 
-        other_user = User.objects.create_user(
-            username="doctor2",
-            password="test123"
-        )
+        other_user = User.objects.create_user(username="doctor2", password="test123")
         other_user.role = User.Role.DOCTOR
         other_user.save()
 
@@ -235,18 +207,14 @@ class DoctorPatientRelationshipTests(TestCase):
         self.client.force_login(other_user)
 
         response = self.client.get(
-            reverse(
-                "encounter_detail",
-                kwargs={"encounter_id": encounter.id}
-            )
+            reverse("encounter_detail", kwargs={"encounter_id": encounter.id})
         )
 
         self.assertEqual(response.status_code, 403)
+
     def test_doctor_can_complete_in_visit_encounter(self):
         # 1. Create an appointment with IN_VISIT status
-        appointment = self.create_appointment(
-            Appointment.Status.IN_VISIT
-        )
+        appointment = self.create_appointment(Appointment.Status.IN_VISIT)
 
         # 2. Create a medical encounter linked to the appointment
         encounter = ClinicalEncounter.objects.create(
@@ -263,10 +231,7 @@ class DoctorPatientRelationshipTests(TestCase):
 
         # 4. Send a POST request to complete the encounter
         response = self.client.post(
-            reverse(
-                "complete_encounter",
-                kwargs={"encounter_id": encounter.id}
-            )
+            reverse("complete_encounter", kwargs={"encounter_id": encounter.id})
         )
 
         # 5. Refresh appointment data from the database
@@ -274,17 +239,11 @@ class DoctorPatientRelationshipTests(TestCase):
 
         # 6. Check the result
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(
-            appointment.status,
-            Appointment.Status.COMPLETED
-        )
-
+        self.assertEqual(appointment.status, Appointment.Status.COMPLETED)
 
     def test_another_doctor_cannot_complete_encounter(self):
         # Create an appointment for the original doctor
-        appointment = self.create_appointment(
-            Appointment.Status.IN_VISIT
-        )
+        appointment = self.create_appointment(Appointment.Status.IN_VISIT)
 
         # Create an encounter for that appointment
         encounter = ClinicalEncounter.objects.create(
@@ -297,16 +256,11 @@ class DoctorPatientRelationshipTests(TestCase):
         )
 
         # Create another doctor
-        other_user = User.objects.create_user(
-            username="doctor2",
-            password="test123"
-        )
+        other_user = User.objects.create_user(username="doctor2", password="test123")
         other_user.role = User.Role.DOCTOR
         other_user.save()
 
-        other_doctor = DoctorProfile.objects.create(
-            user=other_user
-        )
+        other_doctor = DoctorProfile.objects.create(user=other_user)
 
         # Give the other doctor an authorized appointment
         Appointment.objects.create(
@@ -323,10 +277,7 @@ class DoctorPatientRelationshipTests(TestCase):
 
         # Try to complete the original doctor's encounter
         response = self.client.post(
-            reverse(
-                "complete_encounter",
-                kwargs={"encounter_id": encounter.id}
-            )
+            reverse("complete_encounter", kwargs={"encounter_id": encounter.id})
         )
 
         # Check that access is denied
@@ -334,16 +285,11 @@ class DoctorPatientRelationshipTests(TestCase):
 
         # Check that the appointment is still in progress
         appointment.refresh_from_db()
-        self.assertEqual(
-            appointment.status,
-            Appointment.Status.IN_VISIT
-        )
+        self.assertEqual(appointment.status, Appointment.Status.IN_VISIT)
 
     def test_patient_cannot_complete_encounter(self):
         # Create an appointment with IN_VISIT status
-        appointment = self.create_appointment(
-            Appointment.Status.IN_VISIT
-        )
+        appointment = self.create_appointment(Appointment.Status.IN_VISIT)
 
         # Create a clinical encounter
         encounter = ClinicalEncounter.objects.create(
@@ -360,10 +306,7 @@ class DoctorPatientRelationshipTests(TestCase):
 
         # Try to complete the encounter
         response = self.client.post(
-            reverse(
-                "complete_encounter",
-                kwargs={"encounter_id": encounter.id}
-            )
+            reverse("complete_encounter", kwargs={"encounter_id": encounter.id})
         )
 
         # Check that access is denied
@@ -371,16 +314,11 @@ class DoctorPatientRelationshipTests(TestCase):
 
         # Check that the appointment status did not change
         appointment.refresh_from_db()
-        self.assertEqual(
-            appointment.status,
-            Appointment.Status.IN_VISIT
-        )
+        self.assertEqual(appointment.status, Appointment.Status.IN_VISIT)
 
     def test_unauthenticated_user_cannot_complete_encounter(self):
         # Create an appointment with IN_VISIT status
-        appointment = self.create_appointment(
-            Appointment.Status.IN_VISIT
-        )
+        appointment = self.create_appointment(Appointment.Status.IN_VISIT)
 
         # Create a clinical encounter
         encounter = ClinicalEncounter.objects.create(
@@ -396,10 +334,7 @@ class DoctorPatientRelationshipTests(TestCase):
 
         # Try to complete the encounter
         response = self.client.post(
-            reverse(
-                "complete_encounter",
-                kwargs={"encounter_id": encounter.id}
-            )
+            reverse("complete_encounter", kwargs={"encounter_id": encounter.id})
         )
 
         # Check that the user is redirected to login
@@ -407,16 +342,11 @@ class DoctorPatientRelationshipTests(TestCase):
 
         # Check that the appointment status did not change
         appointment.refresh_from_db()
-        self.assertEqual(
-            appointment.status,
-            Appointment.Status.IN_VISIT
-        )
+        self.assertEqual(appointment.status, Appointment.Status.IN_VISIT)
 
     def test_pending_appointment_cannot_be_completed(self):
         # 1. Create a pending appointment
-        appointment = self.create_appointment(
-            Appointment.Status.PENDING
-        )
+        appointment = self.create_appointment(Appointment.Status.PENDING)
 
         # 2. Create a clinical encounter
         encounter = ClinicalEncounter.objects.create(
@@ -433,10 +363,7 @@ class DoctorPatientRelationshipTests(TestCase):
 
         # 4. Try to complete the encounter
         response = self.client.post(
-            reverse(
-                "complete_encounter",
-                kwargs={"encounter_id": encounter.id}
-            )
+            reverse("complete_encounter", kwargs={"encounter_id": encounter.id})
         )
 
         # 5. Check that access is denied
@@ -444,16 +371,11 @@ class DoctorPatientRelationshipTests(TestCase):
 
         # 6. Check that the status did not change
         appointment.refresh_from_db()
-        self.assertEqual(
-            appointment.status,
-            Appointment.Status.PENDING
-        )
+        self.assertEqual(appointment.status, Appointment.Status.PENDING)
 
     def test_completed_appointment_cannot_be_completed_again(self):
         # 1. Create an already completed appointment
-        appointment = self.create_appointment(
-            Appointment.Status.COMPLETED
-        )
+        appointment = self.create_appointment(Appointment.Status.COMPLETED)
 
         # 2. Create a clinical encounter
         encounter = ClinicalEncounter.objects.create(
@@ -470,10 +392,7 @@ class DoctorPatientRelationshipTests(TestCase):
 
         # 4. Try to complete the encounter again
         response = self.client.post(
-            reverse(
-                "complete_encounter",
-                kwargs={"encounter_id": encounter.id}
-            )
+            reverse("complete_encounter", kwargs={"encounter_id": encounter.id})
         )
 
         # 5. Check that the request is rejected
@@ -481,31 +400,23 @@ class DoctorPatientRelationshipTests(TestCase):
 
         # 6. Check that the appointment remains completed
         appointment.refresh_from_db()
-        self.assertEqual(
-            appointment.status,
-            Appointment.Status.COMPLETED
-        )
+        self.assertEqual(appointment.status, Appointment.Status.COMPLETED)
+
     def test_nonexistent_encounter_returns_404(self):
         # 1. Log in as the doctor
         self.client.force_login(self.doctor_user)
 
         # 2. Try to complete a nonexistent encounter
         response = self.client.post(
-            reverse(
-                "complete_encounter",
-                kwargs={"encounter_id": 99999}
-            )
+            reverse("complete_encounter", kwargs={"encounter_id": 99999})
         )
 
         # 3. Check that the encounter was not found
         self.assertEqual(response.status_code, 404)
 
-
     def test_get_request_cannot_complete_encounter(self):
         # 1. Create an appointment in progress
-        appointment = self.create_appointment(
-            Appointment.Status.IN_VISIT
-        )
+        appointment = self.create_appointment(Appointment.Status.IN_VISIT)
 
         # 2. Create a clinical encounter
         encounter = ClinicalEncounter.objects.create(
@@ -522,10 +433,7 @@ class DoctorPatientRelationshipTests(TestCase):
 
         # 4. Try to complete using GET
         response = self.client.get(
-            reverse(
-                "complete_encounter",
-                kwargs={"encounter_id": encounter.id}
-            )
+            reverse("complete_encounter", kwargs={"encounter_id": encounter.id})
         )
 
         # 5. Check that GET is not allowed
@@ -533,10 +441,8 @@ class DoctorPatientRelationshipTests(TestCase):
 
         # 6. Check that the appointment is unchanged
         appointment.refresh_from_db()
-        self.assertEqual(
-            appointment.status,
-            Appointment.Status.IN_VISIT
-        )
+        self.assertEqual(appointment.status, Appointment.Status.IN_VISIT)
+
 
 class PrescriptionTests(TestCase):
     def setUp(self):
@@ -700,14 +606,12 @@ class PrescriptionTests(TestCase):
                 "prescriptions-1-dosage": "20mg",
                 "prescriptions-1-frequency": "Nightly",
                 "prescriptions-1-duration": "90 days",
-                "prescriptions-1-instructions": "Take after dinner","files-TOTAL_FORMS": "1",
-
-
-               "files-TOTAL_FORMS": "1",
-               "files-INITIAL_FORMS": "0",
-               "files-MIN_NUM_FORMS": "0",
-               "files-MAX_NUM_FORMS": "1000",
-
+                "prescriptions-1-instructions": "Take after dinner",
+                "files-TOTAL_FORMS": "1",
+                "files-TOTAL_FORMS": "1",
+                "files-INITIAL_FORMS": "0",
+                "files-MIN_NUM_FORMS": "0",
+                "files-MAX_NUM_FORMS": "1000",
             },
         )
 
@@ -749,11 +653,10 @@ class PrescriptionTests(TestCase):
                 "prescriptions-0-dosage": "",
                 "prescriptions-0-frequency": "Once daily",
                 "prescriptions-0-duration": "30 days",
-
                 "files-TOTAL_FORMS": "1",
-               "files-INITIAL_FORMS": "0",
-               "files-MIN_NUM_FORMS": "0",
-               "files-MAX_NUM_FORMS": "1000",
+                "files-INITIAL_FORMS": "0",
+                "files-MIN_NUM_FORMS": "0",
+                "files-MAX_NUM_FORMS": "1000",
             },
         )
 
@@ -796,11 +699,10 @@ class PrescriptionTests(TestCase):
                 "prescriptions-1-frequency": "Nightly",
                 "prescriptions-1-duration": "90 days",
                 "prescriptions-1-instructions": "Take after dinner",
-
                 "files-TOTAL_FORMS": "1",
-               "files-INITIAL_FORMS": "0",
-               "files-MIN_NUM_FORMS": "0",
-               "files-MAX_NUM_FORMS": "1000",
+                "files-INITIAL_FORMS": "0",
+                "files-MIN_NUM_FORMS": "0",
+                "files-MAX_NUM_FORMS": "1000",
             },
         )
 
@@ -847,18 +749,15 @@ class PrescriptionTests(TestCase):
                 "prescriptions-0-duration": "30 days",
                 "prescriptions-0-instructions": "",
                 "prescriptions-0-DELETE": "on",
-
                 "files-TOTAL_FORMS": "1",
-               "files-INITIAL_FORMS": "0",
-               "files-MIN_NUM_FORMS": "0",
-               "files-MAX_NUM_FORMS": "1000",
+                "files-INITIAL_FORMS": "0",
+                "files-MIN_NUM_FORMS": "0",
+                "files-MAX_NUM_FORMS": "1000",
             },
         )
 
         self.assertEqual(response.status_code, 302)
-        self.assertFalse(
-            Prescription.objects.filter(pk=prescription.pk).exists()
-        )
+        self.assertFalse(Prescription.objects.filter(pk=prescription.pk).exists())
 
     def test_empty_optional_prescription_row_is_accepted(self):
         formset = PrescriptionFormSet(
@@ -877,7 +776,6 @@ class PrescriptionTests(TestCase):
                 "prescriptions-1-frequency": "",
                 "prescriptions-1-duration": "",
                 "prescriptions-1-instructions": "",
-
                 "files-TOTAL_FORMS": "1",
                 "files-INITIAL_FORMS": "0",
                 "files-MIN_NUM_FORMS": "0",
@@ -1012,7 +910,6 @@ class PrescriptionTests(TestCase):
             "Aspirin",
         )
 
-
     def test_completed_encounter_cannot_add_prescription(self):
         # 1. Mark the appointment as completed
         self.appointment.status = Appointment.Status.COMPLETED
@@ -1031,18 +928,15 @@ class PrescriptionTests(TestCase):
                 "chief_complaint": "Headache",
                 "diagnosis": "Migraine",
                 "treatment_notes": "Rest",
-
                 "prescriptions-TOTAL_FORMS": "1",
                 "prescriptions-INITIAL_FORMS": "0",
                 "prescriptions-MIN_NUM_FORMS": "0",
                 "prescriptions-MAX_NUM_FORMS": "1000",
-
                 "prescriptions-0-medication_name": "New Medicine",
                 "prescriptions-0-dosage": "10mg",
                 "prescriptions-0-frequency": "Once daily",
                 "prescriptions-0-duration": "5 days",
                 "prescriptions-0-instructions": "",
-
                 "files-TOTAL_FORMS": "1",
                 "files-INITIAL_FORMS": "0",
                 "files-MIN_NUM_FORMS": "0",
@@ -1086,12 +980,10 @@ class PrescriptionTests(TestCase):
                 "chief_complaint": self.encounter.chief_complaint,
                 "diagnosis": self.encounter.diagnosis,
                 "treatment_notes": self.encounter.treatment_notes,
-
                 "prescriptions-TOTAL_FORMS": "1",
                 "prescriptions-INITIAL_FORMS": "1",
                 "prescriptions-MIN_NUM_FORMS": "0",
                 "prescriptions-MAX_NUM_FORMS": "1000",
-
                 "prescriptions-0-id": str(prescription.id),
                 "prescriptions-0-medication_name": "Aspirin",
                 "prescriptions-0-dosage": "81mg",
@@ -1099,7 +991,6 @@ class PrescriptionTests(TestCase):
                 "prescriptions-0-duration": "30 days",
                 "prescriptions-0-instructions": "",
                 "prescriptions-0-DELETE": "on",
-
                 "files-TOTAL_FORMS": "1",
                 "files-INITIAL_FORMS": "0",
                 "files-MIN_NUM_FORMS": "0",
@@ -1111,11 +1002,7 @@ class PrescriptionTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
         # 6. Make sure the prescription still exists
-        self.assertTrue(
-            Prescription.objects.filter(
-                pk=prescription.pk
-            ).exists()
-        )
+        self.assertTrue(Prescription.objects.filter(pk=prescription.pk).exists())
 
     @patch(
         "records.views.PrescriptionFormSet.save",
@@ -1150,18 +1037,15 @@ class PrescriptionTests(TestCase):
                 "chief_complaint": "Headache",
                 "diagnosis": "Migraine",
                 "treatment_notes": "Rest",
-
                 "prescriptions-TOTAL_FORMS": "1",
                 "prescriptions-INITIAL_FORMS": "0",
                 "prescriptions-MIN_NUM_FORMS": "0",
                 "prescriptions-MAX_NUM_FORMS": "1000",
-
                 "prescriptions-0-medication_name": "Aspirin",
                 "prescriptions-0-dosage": "81mg",
                 "prescriptions-0-frequency": "Once daily",
                 "prescriptions-0-duration": "30 days",
                 "prescriptions-0-instructions": "",
-
                 "files-TOTAL_FORMS": "1",
                 "files-INITIAL_FORMS": "0",
                 "files-MIN_NUM_FORMS": "0",
@@ -1175,9 +1059,7 @@ class PrescriptionTests(TestCase):
 
         # 6. Make sure the encounter was rolled back
         self.assertFalse(
-            ClinicalEncounter.objects.filter(
-                appointment=appointment
-            ).exists()
+            ClinicalEncounter.objects.filter(appointment=appointment).exists()
         )
 
     def test_edit_view_rolls_back_changes_when_prescription_save_fails(self):
@@ -1217,19 +1099,16 @@ class PrescriptionTests(TestCase):
                     "chief_complaint": self.encounter.chief_complaint,
                     "diagnosis": "Updated diagnosis",
                     "treatment_notes": self.encounter.treatment_notes,
-
                     "prescriptions-TOTAL_FORMS": "1",
                     "prescriptions-INITIAL_FORMS": "1",
                     "prescriptions-MIN_NUM_FORMS": "0",
                     "prescriptions-MAX_NUM_FORMS": "1000",
-
                     "prescriptions-0-id": str(prescription.id),
                     "prescriptions-0-medication_name": "Aspirin",
                     "prescriptions-0-dosage": "81mg",
                     "prescriptions-0-frequency": "Twice daily",
                     "prescriptions-0-duration": "30 days",
                     "prescriptions-0-instructions": "",
-
                     "files-TOTAL_FORMS": "1",
                     "files-INITIAL_FORMS": "0",
                     "files-MIN_NUM_FORMS": "0",
@@ -1251,8 +1130,6 @@ class PrescriptionTests(TestCase):
             prescription.frequency,
             original_frequency,
         )
-
-
 
     def test_create_view_saves_medical_file_with_encounter_and_patient(self):
         # 1. Create an in-visit appointment (visit already started)
@@ -1291,17 +1168,14 @@ class PrescriptionTests(TestCase):
                         "chief_complaint": "Headache",
                         "diagnosis": "Migraine",
                         "treatment_notes": "Rest",
-
                         "prescriptions-TOTAL_FORMS": "2",
                         "prescriptions-INITIAL_FORMS": "0",
                         "prescriptions-MIN_NUM_FORMS": "0",
                         "prescriptions-MAX_NUM_FORMS": "1000",
-
                         "files-TOTAL_FORMS": "1",
                         "files-INITIAL_FORMS": "0",
                         "files-MIN_NUM_FORMS": "0",
                         "files-MAX_NUM_FORMS": "1000",
-
                         "files-0-title": "Blood Test Report",
                         "files-0-file_type": "LAB_REPORT",
                         "files-0-file": uploaded_file,
@@ -1312,14 +1186,10 @@ class PrescriptionTests(TestCase):
                 self.assertEqual(response.status_code, 302)
 
                 # 7. Retrieve the created encounter
-                encounter = ClinicalEncounter.objects.get(
-                    appointment=appointment
-                )
+                encounter = ClinicalEncounter.objects.get(appointment=appointment)
 
                 # 8. Retrieve the uploaded medical file
-                medical_file = MedicalFile.objects.get(
-                    encounter=encounter
-                )
+                medical_file = MedicalFile.objects.get(encounter=encounter)
 
                 # 9. Check patient and encounter relationships
                 self.assertEqual(
@@ -1337,7 +1207,6 @@ class PrescriptionTests(TestCase):
                         saved_file.read(),
                         file_content,
                     )
-
 
     def test_completed_encounter_cannot_delete_medical_file(self):
         # 1. Create an existing medical file
@@ -1369,9 +1238,7 @@ class PrescriptionTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
         # 6. Make sure the medical file still exists
-        self.assertTrue(
-            MedicalFile.objects.filter(pk=medical_file.pk).exists()
-        )
+        self.assertTrue(MedicalFile.objects.filter(pk=medical_file.pk).exists())
 
     def test_completed_encounter_cannot_add_medical_file(self):
         # 1. Complete the appointment
@@ -1398,17 +1265,14 @@ class PrescriptionTests(TestCase):
                 "chief_complaint": "Headache",
                 "diagnosis": "Migraine",
                 "treatment_notes": "Rest",
-
                 "prescriptions-TOTAL_FORMS": "2",
                 "prescriptions-INITIAL_FORMS": "0",
                 "prescriptions-MIN_NUM_FORMS": "0",
                 "prescriptions-MAX_NUM_FORMS": "1000",
-
                 "files-TOTAL_FORMS": "1",
                 "files-INITIAL_FORMS": "0",
                 "files-MIN_NUM_FORMS": "0",
                 "files-MAX_NUM_FORMS": "1000",
-
                 "files-0-title": "New Lab Report",
                 "files-0-file_type": "LAB_REPORT",
                 "files-0-file": uploaded_file,
@@ -1419,19 +1283,13 @@ class PrescriptionTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
         # 6. Make sure no file was added
-        self.assertFalse(
-            MedicalFile.objects.filter(
-                encounter=self.encounter
-            ).exists()
-        )
+        self.assertFalse(MedicalFile.objects.filter(encounter=self.encounter).exists())
 
     @patch(
         "records.views.MedicalFileFormSet.save",
         side_effect=RuntimeError("Simulated medical file save failure"),
     )
-    def test_create_view_rolls_back_when_medical_file_save_fails(
-        self, mock_save
-    ):
+    def test_create_view_rolls_back_when_medical_file_save_fails(self, mock_save):
         appointment = Appointment.objects.create(
             doctor=self.doctor,
             patient=self.patient,
@@ -1459,23 +1317,19 @@ class PrescriptionTests(TestCase):
                 "chief_complaint": "Headache",
                 "diagnosis": "Migraine",
                 "treatment_notes": "Rest",
-
                 "prescriptions-TOTAL_FORMS": "2",
                 "prescriptions-INITIAL_FORMS": "0",
                 "prescriptions-MIN_NUM_FORMS": "0",
                 "prescriptions-MAX_NUM_FORMS": "1000",
-
                 "prescriptions-0-medication_name": "Aspirin",
                 "prescriptions-0-dosage": "81mg",
                 "prescriptions-0-frequency": "Once daily",
                 "prescriptions-0-duration": "30 days",
                 "prescriptions-0-instructions": "",
-
                 "files-TOTAL_FORMS": "1",
                 "files-INITIAL_FORMS": "0",
                 "files-MIN_NUM_FORMS": "0",
                 "files-MAX_NUM_FORMS": "1000",
-
                 "files-0-title": "Blood Test",
                 "files-0-file_type": "LAB_REPORT",
                 "files-0-file": uploaded_file,
@@ -1486,9 +1340,7 @@ class PrescriptionTests(TestCase):
         mock_save.assert_called_once()
 
         self.assertFalse(
-            ClinicalEncounter.objects.filter(
-                appointment=appointment
-            ).exists()
+            ClinicalEncounter.objects.filter(appointment=appointment).exists()
         )
 
         self.assertFalse(
@@ -1499,14 +1351,11 @@ class PrescriptionTests(TestCase):
         )
         self.assertFalse(Prescription.objects.exists())
 
-
     @patch(
         "records.views.MedicalFileFormSet.save",
         side_effect=RuntimeError("Simulated medical file save failure"),
     )
-    def test_edit_view_rolls_back_when_medical_file_save_fails(
-        self, mock_save
-    ):
+    def test_edit_view_rolls_back_when_medical_file_save_fails(self, mock_save):
         # 1. Create an existing prescription
         prescription = Prescription.objects.create(
             encounter=self.encounter,
@@ -1534,19 +1383,16 @@ class PrescriptionTests(TestCase):
                 "chief_complaint": "Headache",
                 "diagnosis": "Updated diagnosis",
                 "treatment_notes": "Updated notes",
-
                 "prescriptions-TOTAL_FORMS": "1",
                 "prescriptions-INITIAL_FORMS": "1",
                 "prescriptions-MIN_NUM_FORMS": "0",
                 "prescriptions-MAX_NUM_FORMS": "1000",
-
                 "prescriptions-0-id": str(prescription.id),
                 "prescriptions-0-medication_name": "Aspirin",
                 "prescriptions-0-dosage": "81mg",
                 "prescriptions-0-frequency": "Twice daily",
                 "prescriptions-0-duration": "30 days",
                 "prescriptions-0-instructions": "",
-
                 "files-TOTAL_FORMS": "1",
                 "files-INITIAL_FORMS": "0",
                 "files-MIN_NUM_FORMS": "0",
@@ -1593,9 +1439,7 @@ class VisitFlowFilesAndHistoryTests(TestCase):
         self.doctor = DoctorProfile.objects.create(user=self.doctor_user)
         self.other_doctor = DoctorProfile.objects.create(user=self.other_doctor_user)
         self.patient = PatientProfile.objects.create(user=self.patient_user)
-        self.other_patient = PatientProfile.objects.create(
-            user=self.other_patient_user
-        )
+        self.other_patient = PatientProfile.objects.create(user=self.other_patient_user)
 
     def make_appointment(self, status, patient=None, doctor=None):
         return Appointment.objects.create(
@@ -1641,7 +1485,9 @@ class VisitFlowFilesAndHistoryTests(TestCase):
         appointment = self.make_appointment(Appointment.Status.APPROVED)
         self.client.force_login(self.doctor_user)
 
-        response = self.client.post(reverse("start_visit", kwargs={"pk": appointment.id}))
+        response = self.client.post(
+            reverse("start_visit", kwargs={"pk": appointment.id})
+        )
 
         appointment.refresh_from_db()
         self.assertEqual(appointment.status, Appointment.Status.IN_VISIT)
@@ -1654,7 +1500,9 @@ class VisitFlowFilesAndHistoryTests(TestCase):
         appointment = self.make_appointment(Appointment.Status.APPROVED)
         self.client.force_login(self.doctor_user)
 
-        response = self.client.get(reverse("start_visit", kwargs={"pk": appointment.id}))
+        response = self.client.get(
+            reverse("start_visit", kwargs={"pk": appointment.id})
+        )
 
         self.assertEqual(response.status_code, 405)
 
@@ -1696,7 +1544,9 @@ class VisitFlowFilesAndHistoryTests(TestCase):
         medical_file = self.make_file()
         self.client.force_login(self.patient_user)
 
-        response = self.client.get(reverse("download_file", kwargs={"pk": medical_file.pk}))
+        response = self.client.get(
+            reverse("download_file", kwargs={"pk": medical_file.pk})
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(b"".join(response.streaming_content), b"%PDF-1.4 data")
@@ -1707,7 +1557,9 @@ class VisitFlowFilesAndHistoryTests(TestCase):
         medical_file = self.make_file()
         self.client.force_login(self.doctor_user)
 
-        response = self.client.get(reverse("download_file", kwargs={"pk": medical_file.pk}))
+        response = self.client.get(
+            reverse("download_file", kwargs={"pk": medical_file.pk})
+        )
 
         self.assertEqual(response.status_code, 200)
 
@@ -1747,19 +1599,26 @@ class VisitFlowFilesAndHistoryTests(TestCase):
             self.make_appointment(Appointment.Status.COMPLETED), diagnosis="Old flu"
         )
         new = self.make_encounter(
-            self.make_appointment(Appointment.Status.COMPLETED, doctor=self.other_doctor),
+            self.make_appointment(
+                Appointment.Status.COMPLETED, doctor=self.other_doctor
+            ),
             diagnosis="Sprained ankle",
         )
         self.make_encounter(
             self.make_appointment(Appointment.Status.IN_VISIT), diagnosis="Draft visit"
         )
         self.make_encounter(
-            self.make_appointment(Appointment.Status.COMPLETED, patient=self.other_patient),
+            self.make_appointment(
+                Appointment.Status.COMPLETED, patient=self.other_patient
+            ),
             diagnosis="Someone else",
         )
         Prescription.objects.create(
-            encounter=new, medication_name="Ibuprofen", dosage="400mg",
-            frequency="3x daily", duration="5 days",
+            encounter=new,
+            medication_name="Ibuprofen",
+            dosage="400mg",
+            frequency="3x daily",
+            duration="5 days",
         )
         attached = self.make_file(encounter=new)
         self.client.force_login(self.patient_user)
@@ -1768,7 +1627,9 @@ class VisitFlowFilesAndHistoryTests(TestCase):
 
         self.assertEqual(list(response.context["encounters"]), [new, old])
         self.assertContains(response, "Ibuprofen")
-        self.assertContains(response, reverse("download_file", kwargs={"pk": attached.pk}))
+        self.assertContains(
+            response, reverse("download_file", kwargs={"pk": attached.pk})
+        )
         self.assertNotContains(response, "Draft visit")
         self.assertNotContains(response, "Someone else")
 
@@ -1779,6 +1640,19 @@ class VisitFlowFilesAndHistoryTests(TestCase):
         response = self.client.get(reverse("medical_history"))
 
         self.assertEqual(list(response.context["other_files"]), [loose])
+
+    def test_history_redirects_safely_when_profile_is_missing(self):
+        missing_user = User.objects.create_user(
+            "missing-history-profile",
+            password="pw-test-123",
+            role=User.Role.PATIENT,
+        )
+        PatientProfile.objects.filter(user=missing_user).delete()
+        self.client.force_login(missing_user)
+
+        response = self.client.get(reverse("medical_history"))
+
+        self.assertRedirects(response, reverse("patient_dashboard"))
 
     def test_doctor_cannot_open_patient_history_page(self):
         self.client.force_login(self.doctor_user)
@@ -1821,7 +1695,9 @@ class VisitFlowFilesAndHistoryTests(TestCase):
             reverse("encounter_edit", kwargs={"encounter_id": encounter.id})
         )
 
-        self.assertContains(response, reverse("download_file", kwargs={"pk": medical_file.pk}))
+        self.assertContains(
+            response, reverse("download_file", kwargs={"pk": medical_file.pk})
+        )
         self.assertNotContains(response, "/media/")
 
     def test_permission_denied_uses_friendly_403_page(self):
@@ -1836,7 +1712,9 @@ class VisitFlowFilesAndHistoryTests(TestCase):
 
         self.assertEqual(response.status_code, 403)
         self.assertTemplateUsed(response, "403.html")
-        self.assertContains(response, "Completed encounters cannot be edited.", status_code=403)
+        self.assertContains(
+            response, "Completed encounters cannot be edited.", status_code=403
+        )
 
     # --- QA round 2 -------------------------------------------------------
 
@@ -1856,10 +1734,14 @@ class VisitFlowFilesAndHistoryTests(TestCase):
         appointment.save()
         self.client.force_login(self.doctor_user)
 
-        response = self.client.post(reverse("start_visit", kwargs={"pk": appointment.id}))
+        response = self.client.post(
+            reverse("start_visit", kwargs={"pk": appointment.id})
+        )
 
         appointment.refresh_from_db()
-        self.assertRedirects(response, reverse("doctor_dashboard"), fetch_redirect_response=False)
+        self.assertRedirects(
+            response, reverse("doctor_dashboard"), fetch_redirect_response=False
+        )
         self.assertEqual(appointment.status, Appointment.Status.APPROVED)
 
     def test_history_and_detail_show_the_appointment_date(self):
