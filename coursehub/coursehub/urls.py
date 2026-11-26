@@ -33,7 +33,8 @@ urlpatterns = [
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("accounts/register/", register, name="register"),
     path("enrollments/", include("enrollments.urls")),
+    path("reviews/", include("reviews.urls")),
+    path("api/", include("courses.api_urls")),
 ]
-
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

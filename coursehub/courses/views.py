@@ -5,8 +5,9 @@ from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
-from django.db.models import Avg, Count
-from django.http import HttpResponse, JsonResponse
+from django.core.paginator import Paginator
+from django.db.models import Avg, Count, Q
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.views.decorators.http import require_POST
@@ -15,9 +16,12 @@ from django.views.generic import ListView
 
 from accounts.decorators import InstructorRequiredMixin, instructor_required
 from enrollments.models import Enrollment
-
+from reviews.forms import ReviewForm
+from reviews.models import Review
 from .forms import CourseForm, LessonForm, ModuleForm
-from .models import Course, Lesson, Module, LessonProgress
+from .models import Category, Course, Lesson, LessonProgress, Module
+
+COURSES_PER_PAGE = 9
 
 
 class CourseFormMixin:
@@ -59,7 +63,44 @@ class CourseUpdateView(InstructorRequiredMixin, CourseFormMixin, UpdateView):
 
 
 def course_list(request):
-    return HttpResponse("Courses app is working")
+    """Public catalogue of published courses, with search and category filters."""
+    q = request.GET.get("q", "").strip()
+    category_id = request.GET.get("category", "").strip()
+
+    courses = (
+        Course.objects.filter(status=Course.Status.PUBLISHED)
+        .select_related("instructor", "category")
+        .order_by("-created_at", "-pk")
+    )
+
+    if q:
+        courses = courses.filter(
+            Q(title__icontains=q)
+            | Q(subtitle__icontains=q)
+            | Q(description__icontains=q)
+        )
+
+    selected_category = None
+    if category_id.isdigit():
+        selected_category = Category.objects.filter(pk=int(category_id)).first()
+        if selected_category is not None:
+            courses = courses.filter(category=selected_category)
+
+    page_obj = Paginator(courses, COURSES_PER_PAGE).get_page(
+        request.GET.get("page")
+    )
+
+    return render(
+        request,
+        "courses/course_list.html",
+        {
+            "courses": page_obj.object_list,
+            "page_obj": page_obj,
+            "q": q,
+            "categories": Category.objects.order_by("name"),
+            "selected_category": selected_category,
+        },
+    )
 
 
 def course_outline(request, pk):
@@ -88,6 +129,35 @@ def course_outline(request, pk):
         ).exists()
     )
 
+    is_student = (
+        request.user.is_authenticated
+        and request.user.role == request.user.Role.STUDENT
+    )
+
+    completion_percent = (
+        course.get_completion_percentage(request.user)
+        if is_student and is_enrolled
+        else 0
+    )
+
+    has_reviewed = (
+        Review.objects.filter(
+            student=request.user,
+            course=course,
+        ).exists()
+        if is_student and is_enrolled
+        else False
+    )
+
+    is_review_eligible = (
+        is_student
+        and is_enrolled
+        and course.has_completed_at_least(request.user, 50)
+        and not has_reviewed
+    )
+
+    review_form = ReviewForm() if is_review_eligible else None
+
     return render(
         request,
         "courses/course_outline.html",
@@ -102,6 +172,10 @@ def course_outline(request, pk):
             "average_rating": course.average_rating,
             "review_count": course.review_count,
             "reviews": reviews,
+            "completion_percent": completion_percent,
+            "has_reviewed": has_reviewed,
+            "is_review_eligible": is_review_eligible,
+            "review_form": review_form,
         },
     )
 
@@ -165,7 +239,15 @@ def home(request):
         )
         .order_by("-created_at")[:8]
     )
-    return render(request, "home.html", {"courses": courses})
+
+    popular_courses = (
+        Course.objects.filter(status=Course.Status.PUBLISHED)
+        .select_related("instructor", "category")
+        .annotate(attendee_count=Count("enrollments", distinct=True))
+        .order_by("-attendee_count", "-created_at")[:8]
+    )
+
+    return render(request, "home.html", {"courses": courses, "popular_courses": popular_courses})
 
 
 def about(request):
@@ -360,10 +442,11 @@ def toggle_publish(request, pk):
     return redirect("studio")
 
 
-@login_required
 @require_POST
 def complete_lesson(request, lesson_id):
     """Mark a lesson as complete via AJAX."""
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "Authentication required"}, status=401)
     lesson = get_object_or_404(Lesson, pk=lesson_id)
     course = lesson.module.course
 

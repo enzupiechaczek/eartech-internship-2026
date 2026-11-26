@@ -2,6 +2,7 @@ import io
 import os
 import shutil
 import tempfile
+from datetime import timedelta
 from decimal import Decimal
 from urllib.parse import parse_qs, urlparse
 
@@ -10,8 +11,8 @@ from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 from PIL import Image
-
 
 from enrollments.models import Enrollment
 
@@ -49,12 +50,35 @@ class LessonProgressTests(TestCase):
     def test_completion_percentage_zero(self):
         percent = self.course.get_completion_percentage(self.user)
         self.assertEqual(percent, 0)
+    def test_completion_percentage_zero_when_course_has_no_lessons(self):
+        empty_course = Course.objects.create(
+            title='Empty Course',
+            description='Course without lessons',
+            instructor=self.instructor,
+            status=Course.Status.PUBLISHED
+        )
+
+        percent = empty_course.get_completion_percentage(self.user)
+        self.assertEqual(percent, 0)
 
     def test_completion_percentage_half(self):
         LessonProgress.objects.create(student=self.user, lesson=self.lesson1)
         percent = self.course.get_completion_percentage(self.user)
         self.assertEqual(percent, 50)
+    def test_completion_percentage_rounds_partial_progress(self):
+        lesson3 = Lesson.objects.create(
+            module=self.module,
+            title='Lesson 3'
+        )
 
+        LessonProgress.objects.create(
+            student=self.user,
+            lesson=self.lesson1
+        )
+
+        percent = self.course.get_completion_percentage(self.user)
+
+        self.assertEqual(percent, 33)
     def test_completion_percentage_full(self):
         LessonProgress.objects.create(student=self.user, lesson=self.lesson1)
         LessonProgress.objects.create(student=self.user, lesson=self.lesson2)
@@ -63,7 +87,7 @@ class LessonProgressTests(TestCase):
 
     def test_complete_lesson_view(self):
         self.client.login(username='student', password='pass')
-        response = self.client.post(reverse('courses:complete_lesson', args=[self.lesson1.pk]))
+        response = self.client.post(reverse('courses_api:complete_lesson', args=[self.lesson1.pk]))
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data['lesson'], self.lesson1.pk)
@@ -72,29 +96,30 @@ class LessonProgressTests(TestCase):
     def test_non_enrolled_user_gets_403(self):
         other_user = self.User.objects.create_user(username="other", password="pass")
         self.client.login(username="other", password="pass")
-        response = self.client.post(reverse('courses:complete_lesson', args=[self.lesson1.pk]))
+        response = self.client.post(reverse('courses_api:complete_lesson', args=[self.lesson1.pk]))
         self.assertEqual(response.status_code, 403)
 
-    def test_anonymous_user_redirected(self):
-        response = self.client.post(reverse('courses:complete_lesson', args=[self.lesson1.pk]))
-        self.assertEqual(response.status_code, 302)
-        self.assertIn("/login/", response.url)
+    def test_anonymous_user_gets_401(self):
+        response = self.client.post(reverse('courses_api:complete_lesson', args=[self.lesson1.pk]))
+        self.assertEqual(response.status_code, 401)
+        self.assertIn("error", response.json())
+        self.assertFalse(LessonProgress.objects.exists())
 
     def test_get_request_returns_405(self):
         self.client.login(username="student", password="pass")
-        response = self.client.get(reverse('courses:complete_lesson', args=[self.lesson1.pk]))
+        response = self.client.get(reverse('courses_api:complete_lesson', args=[self.lesson1.pk]))
         self.assertEqual(response.status_code, 405)
 
     def test_double_click_creates_single_record(self):
         self.client.login(username="student", password="pass")
 
         # first click
-        response1 = self.client.post(reverse('courses:complete_lesson', args=[self.lesson1.pk]))
+        response1 = self.client.post(reverse('courses_api:complete_lesson', args=[self.lesson1.pk]))
         self.assertEqual(response1.status_code, 200)
         percent1 = response1.json()["percent"]
 
         # second click
-        response2 = self.client.post(reverse('courses:complete_lesson', args=[self.lesson1.pk]))
+        response2 = self.client.post(reverse('courses_api:complete_lesson', args=[self.lesson1.pk]))
         self.assertEqual(response2.status_code, 200)
         percent2 = response2.json()["percent"]
 
@@ -113,11 +138,11 @@ class LessonProgressTests(TestCase):
 
         draft_module = Module.objects.create(course=draft_course, title='Draft Module')
         draft_lesson = Lesson.objects.create(module=draft_module, title='Draft Lesson')
-        
+
         Enrollment.objects.create(student=self.user, course=draft_course)
 
         self.client.login(username='student', password='pass')
-        response = self.client.post(reverse('courses:complete_lesson', args=[draft_lesson.pk]))
+        response = self.client.post(reverse('courses_api:complete_lesson', args=[draft_lesson.pk]))
         self.assertEqual(response.status_code, 403)
 
     def test_enrolled_student_sees_progress_bar_and_button(self):
@@ -127,7 +152,7 @@ class LessonProgressTests(TestCase):
         self.assertContains(response, 'progress-bar')
         self.assertContains(response, 'complete-btn')
         self.assertContains(response, 'Mark as Complete')
-    
+
     def test_instructor_does_not_see_progress_controls(self):
         self.client.login(username='instructor', password='pass')
         response = self.client.get(reverse('courses:lesson_view', args=[self.lesson1.pk]))
@@ -146,7 +171,7 @@ class LessonProgressTests(TestCase):
 
     def test_instructor_cannot_complete_lesson(self):
         self.client.login(username='instructor', password='pass')
-        response = self.client.post(reverse('courses:complete_lesson', args=[self.lesson1.pk]))
+        response = self.client.post(reverse('courses_api:complete_lesson', args=[self.lesson1.pk]))
         self.assertEqual(response.status_code, 403)
         self.assertFalse(LessonProgress.objects.filter(student=self.instructor, lesson=self.lesson1).exists())
 
@@ -317,7 +342,71 @@ class HomeViewTests(TestCase):
         response = self.client.get(reverse("home"))
         self.assertContains(response, "No courses yet.")
 
+    def create_popular_test_course(self, title, status=Course.Status.PUBLISHED):
+        return Course.objects.create(
+            title=title,
+            description="Test course",
+            instructor=self.omar,
+            status=status,
+        )
 
+    def add_test_enrollments(self, course, count, prefix):
+        for i in range(count):
+            student = get_user_model().objects.create_user(
+                username=f"{prefix}_{i}",
+                password="pass",
+            )
+            Enrollment.objects.create(student=student, course=course)
+
+    def test_popular_courses_order_by_enrollment_count_and_creation_date(self):
+        popular = self.create_popular_test_course("Most Popular")
+        older_tie = self.create_popular_test_course("Older Tie")
+        newer_tie = self.create_popular_test_course("Newer Tie")
+
+        self.add_test_enrollments(popular, 2, "popular_student")
+        self.add_test_enrollments(older_tie, 1, "older_student")
+        self.add_test_enrollments(newer_tie, 1, "newer_student")
+
+        now = timezone.now()
+        Course.objects.filter(pk=older_tie.pk).update(
+            created_at=now - timedelta(days=2)
+        )
+        Course.objects.filter(pk=newer_tie.pk).update(
+            created_at=now - timedelta(days=1)
+        )
+
+        response = self.client.get(reverse("home"))
+        popular_titles = [
+            course.title
+            for course in response.context["popular_courses"]
+        ]
+
+        self.assertEqual(
+            popular_titles,
+            ["Most Popular", "Newer Tie", "Older Tie"],
+        )
+
+    def test_popular_courses_exclude_drafts_and_limit_to_eight(self):
+        for i in range(9):
+            self.create_popular_test_course(f"Published Course {i}")
+
+        draft = self.create_popular_test_course(
+            "Highly Enrolled Draft",
+            status=Course.Status.DRAFT,
+        )
+        self.add_test_enrollments(draft, 10, "draft_student")
+
+        response = self.client.get(reverse("home"))
+        popular_courses = response.context["popular_courses"]
+
+        self.assertEqual(len(popular_courses), 8)
+        self.assertTrue(
+            all(
+                course.status == Course.Status.PUBLISHED
+                for course in popular_courses
+            )
+        )
+        self.assertNotIn(draft, popular_courses)
 
 class CourseCurriculumTests(TestCase):
 
@@ -1655,6 +1744,177 @@ class CourseThumbnailUploadViewTests(TestCase):
         self.assertEqual(course.thumbnail.name, old_name)
 
 
+class CourseCatalogTests(TestCase):
+    """AB#3327: catalogue template, normalized query, filters and paging."""
+
+    def setUp(self):
+        self.instructor = get_user_model().objects.create_user(
+            username="catalog-instructor",
+            password="pass",
+        )
+
+    def make_course(self, title, status=Course.Status.PUBLISHED, **kwargs):
+        return Course.objects.create(
+            title=title,
+            description=kwargs.pop("description", "A useful course."),
+            instructor=self.instructor,
+            status=status,
+            **kwargs,
+        )
+
+    def test_missing_and_blank_query_normalize_to_empty_string(self):
+        missing = self.client.get(reverse("courses:list"))
+        blank = self.client.get(reverse("courses:list"), {"q": "   "})
+
+        self.assertEqual(missing.status_code, 200)
+        self.assertTemplateUsed(missing, "courses/course_list.html")
+        self.assertEqual(missing.context["q"], "")
+        self.assertEqual(blank.context["q"], "")
+        self.assertContains(missing, 'value=""')
+
+    def test_query_with_surrounding_whitespace_is_normalized(self):
+        response = self.client.get(reverse("courses:list"), {"q": "  Django  "})
+
+        self.assertEqual(response.context["q"], "Django")
+        self.assertContains(response, 'value="Django"')
+
+    def test_query_filters_published_courses_case_insensitively(self):
+        django = self.make_course(
+            title="Django Fundamentals",
+            subtitle="Web framework",
+            description="Python for the web",
+        )
+        flask = self.make_course(title="Flask Basics")
+        draft = self.make_course(title="Django Draft", status=Course.Status.DRAFT)
+
+        by_title = self.client.get(reverse("courses:list"), {"q": "django"})
+        by_subtitle = self.client.get(reverse("courses:list"), {"q": "FRAMEWORK"})
+        by_description = self.client.get(reverse("courses:list"), {"q": "python"})
+
+        for response in (by_title, by_subtitle, by_description):
+            self.assertEqual(
+                list(response.context["courses"]),
+                [django],
+            )
+            self.assertNotIn(flask, response.context["courses"])
+            self.assertNotIn(draft, response.context["courses"])
+
+    def test_category_filter_and_invalid_category(self):
+        programming = Category.objects.create(name="Programming")
+        design = Category.objects.create(name="Design")
+        python = self.make_course(title="Python", category=programming)
+        ux = self.make_course(title="UX", category=design)
+
+        filtered = self.client.get(
+            reverse("courses:list"), {"category": design.pk}
+        )
+        self.assertEqual(list(filtered.context["courses"]), [ux])
+        self.assertEqual(filtered.context["selected_category"], design)
+
+        invalid = self.client.get(reverse("courses:list"), {"category": "abc"})
+        self.assertCountEqual(invalid.context["courses"], [python, ux])
+        self.assertIsNone(invalid.context["selected_category"])
+
+    def test_unknown_numeric_category_is_ignored(self):
+        python = self.make_course(title="Python")
+        django = self.make_course(title="Django")
+
+        response = self.client.get(reverse("courses:list"), {"category": "99999"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.context["selected_category"])
+        self.assertCountEqual(response.context["courses"], [python, django])
+
+    def test_catalog_is_paginated(self):
+        for number in range(10):
+            self.make_course(title=f"Course {number}")
+
+        first_page = self.client.get(reverse("courses:list"))
+        second_page = self.client.get(reverse("courses:list"), {"page": 2})
+        last_page = self.client.get(reverse("courses:list"), {"page": 999})
+
+        self.assertEqual(len(first_page.context["courses"]), 9)
+        self.assertTrue(first_page.context["page_obj"].has_next())
+        self.assertEqual(len(second_page.context["courses"]), 1)
+        self.assertEqual(len(last_page.context["courses"]), 1)
+        self.assertContains(first_page, "page=2")
+
+    def test_empty_state_for_query_with_no_matches(self):
+        self.make_course(title="Django Fundamentals")
+
+        response = self.client.get(reverse("courses:list"), {"q": "missing"})
+
+        self.assertEqual(list(response.context["courses"]), [])
+        self.assertContains(response, "No courses found.")
+
+    def test_result_summary_uses_total_across_pages(self):
+        for number in range(10):
+            self.make_course(title=f"Python {number}")
+
+        first_page = self.client.get(reverse("courses:list"), {"q": "Python"})
+        second_page = self.client.get(
+            reverse("courses:list"), {"q": "Python", "page": 2}
+        )
+
+        self.assertEqual(first_page.context["page_obj"].paginator.count, 10)
+        self.assertEqual(len(first_page.context["courses"]), 9)
+        self.assertEqual(len(second_page.context["courses"]), 1)
+        self.assertContains(first_page, "10 courses found")
+        self.assertContains(second_page, "10 courses found")
+
+    def test_combined_search_and_category_filter(self):
+        programming = Category.objects.create(name="Programming")
+        design = Category.objects.create(name="Design")
+        django = self.make_course(title="Django", category=programming)
+        django_design = self.make_course(title="Django UX", category=design)
+        flask = self.make_course(title="Flask", category=programming)
+        draft = self.make_course(
+            title="Django Draft",
+            status=Course.Status.DRAFT,
+            category=programming,
+        )
+
+        response = self.client.get(
+            reverse("courses:list"),
+            {"q": "django", "category": programming.pk},
+        )
+
+        self.assertEqual(list(response.context["courses"]), [django])
+        self.assertNotIn(django_design, response.context["courses"])
+        self.assertNotIn(flask, response.context["courses"])
+        self.assertNotIn(draft, response.context["courses"])
+
+    def test_pagination_links_preserve_both_filters(self):
+        category = Category.objects.create(name="Programming")
+        for number in range(10):
+            self.make_course(
+                title=f"Python & Django {number}", category=category
+            )
+
+        response = self.client.get(
+            reverse("courses:list"),
+            {"q": "Python & Django", "category": category.pk},
+        )
+
+        self.assertEqual(response.context["q"], "Python & Django")
+        self.assertEqual(response.context["selected_category"], category)
+        self.assertContains(
+            response,
+            f"q=Python%20%26%20Django&amp;category={category.pk}&amp;page=2",
+        )
+
+    def test_draft_courses_excluded_without_query(self):
+        published = self.make_course(title="Published course")
+        draft = self.make_course(title="Draft course", status=Course.Status.DRAFT)
+
+        response = self.client.get(reverse("courses:list"))
+
+        self.assertEqual(response.context["q"], "")
+        self.assertEqual(list(response.context["courses"]), [published])
+        self.assertNotIn(draft, response.context["courses"])
+        self.assertNotContains(response, "Draft course")
+
+
 class LessonDetailTemplateTests(TestCase):
     def setUp(self):
         User = get_user_model()
@@ -1817,7 +2077,7 @@ class LessonCompletionFetchTests(TestCase):
             order=2,
         )
         self.lesson_url = reverse("courses:lesson_view", args=[self.lesson_1.id])
-        self.complete_url = reverse("courses:complete_lesson", args=[self.lesson_1.id])
+        self.complete_url = reverse("courses_api:complete_lesson", args=[self.lesson_1.id])
         self.client.force_login(self.student)
 
     def test_complete_button_renders_data_attributes_and_url(self):
@@ -1890,13 +2150,14 @@ class LessonCompletionFetchTests(TestCase):
         )
         self.assertContains(completed_response, "Completed ✓")
         self.assertContains(completed_response, "disabled")
+        self.assertNotContains(completed_response, 'id="complete-btn"')
 
     def test_error_container_and_double_click_guard_rendered(self):
         response = self.client.get(self.lesson_url)
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'id="error-message"')
-        self.assertContains(response, 'class="alert alert-danger mt-3 d-none"')
+        self.assertContains(response, 'class="alert alert-danger mt-3 mb-0 d-none"')
         self.assertContains(response, 'role="alert"')
         self.assertContains(response, "completeBtn.disabled = true;")
         self.assertContains(response, "completeBtn.disabled = false;")
@@ -1933,3 +2194,94 @@ class LessonCompletionFetchTests(TestCase):
         self.assertContains(reloaded_response, "Completed ✓")
 
 
+class MarkLessonCompleteTests(TestCase):
+    """Mark lesson complete: API responses, CSRF and lesson page state."""
+
+    # Same course, lessons and enrolled student as LessonProgressTests.
+    setUp = LessonProgressTests.setUp
+
+    def complete_url(self, lesson_id):
+        return reverse('courses_api:complete_lesson', args=[lesson_id])
+
+    def csrf_client_with_token(self):
+        """A CSRF-enforcing client, logged in, holding the lesson page's token."""
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(self.user)
+        client.get(reverse('courses:lesson_view', args=[self.lesson1.pk]))
+        return client, client.cookies['csrftoken'].value
+
+    # ----- API ------------------------------------------------------------
+
+    def test_unknown_lesson_returns_404(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(self.complete_url(99999))
+
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(LessonProgress.objects.exists())
+
+    def test_returns_json_body_and_saves_progress(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(self.complete_url(self.lesson1.pk))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {"lesson": self.lesson1.pk, "percent": 50, "completed": True},
+        )
+        progress = LessonProgress.objects.get()
+        self.assertEqual(progress.student, self.user)
+        self.assertEqual(progress.lesson, self.lesson1)
+
+    def test_percent_increases_with_each_completed_lesson(self):
+        self.client.force_login(self.user)
+
+        first = self.client.post(self.complete_url(self.lesson1.pk))
+        second = self.client.post(self.complete_url(self.lesson2.pk))
+
+        self.assertEqual(first.json()["percent"], 50)
+        self.assertEqual(second.json()["percent"], 100)
+
+    # ----- CSRF -----------------------------------------------------------
+
+    def test_post_without_csrf_token_returns_403(self):
+        client, _ = self.csrf_client_with_token()
+
+        response = client.post(self.complete_url(self.lesson1.pk))
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(LessonProgress.objects.exists())
+
+    def test_post_with_csrf_token_returns_200(self):
+        client, token = self.csrf_client_with_token()
+
+        response = client.post(
+            self.complete_url(self.lesson1.pk),
+            headers={"X-CSRFToken": token},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            LessonProgress.objects.filter(
+                student=self.user, lesson=self.lesson1
+            ).exists()
+        )
+
+    # ----- lesson page ----------------------------------------------------
+
+    def test_completed_lesson_shows_completed_button_without_complete_btn(self):
+        LessonProgress.objects.create(student=self.user, lesson=self.lesson1)
+        self.client.force_login(self.user)
+
+        response = self.client.get(
+            reverse('courses:lesson_view', args=[self.lesson1.pk])
+        )
+
+        # Match the real button: the page script also contains "Completed ✓".
+        self.assertContains(
+            response,
+            '<button class="btn btn-success" disabled>Completed ✓</button>',
+            html=True,
+        )
+        self.assertNotContains(response, 'id="complete-btn"')

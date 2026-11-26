@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}Course catalogue | CourseHub{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <header class="mb-4">
+        <span class="home-eyebrow home-eyebrow-dark">Catalogue</span>
+        <h1 class="home-section-title mb-1">All courses</h1>
+        <p class="home-section-text mb-0">
+            Browse published courses and find your next one.
+        </p>
+    </header>
+
+    <form class="row g-2 align-items-end mb-4" method="get" action="{% url 'courses:list' %}">
+        <div class="col-12 col-md-7">
+            <label class="form-label" for="catalog-search">Search courses</label>
+            <input
+                class="form-control"
+                id="catalog-search"
+                type="search"
+                name="q"
+                value="{{ q }}"
+                placeholder="Search by title, subtitle or description">
+        </div>
+        <div class="col-12 col-md-3">
+            <label class="form-label" for="catalog-category">Category</label>
+            <select class="form-select" id="catalog-category" name="category">
+                <option value="">All categories</option>
+                {% for category in categories %}
+                    <option value="{{ category.pk }}"
+                        {% if selected_category and selected_category.pk == category.pk %}selected{% endif %}>
+                        {{ category.name }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-12 col-md-2 d-grid">
+            <button type="submit" class="btn btn-primary">Apply</button>
+        </div>
+    </form>
+
+    {% if q or selected_category %}
+        <p class="text-muted mb-3">
+            {{ page_obj.paginator.count }} course{{ page_obj.paginator.count|pluralize }} found
+            {% if q %}for &ldquo;{{ q }}&rdquo;{% endif %}
+            {% if selected_category %}in {{ selected_category.name }}{% endif %}.
+            <a class="ms-2" href="{% url 'courses:list' %}">Clear filters</a>
+        </p>
+    {% endif %}
+
+    {% if courses %}
+        <div class="home-grid">
+            {% for course in courses %}
+                <article class="home-card">
+                    <a class="home-card-media" href="{% url 'courses:outline' course.pk %}">
+                        <img
+                            src="{% if course.thumbnail %}{{ course.thumbnail.url }}{% else %}https://placehold.co/600x338/e2e8f0/64748b?text=Course{% endif %}"
+                            alt="{{ course.title }}"
+                            loading="lazy">
+                        {% if course.category %}
+                            <span class="home-badge">{{ course.category.name }}</span>
+                        {% endif %}
+                    </a>
+
+                    <div class="home-card-body">
+                        <h2 class="home-card-title">
+                            <a href="{% url 'courses:outline' course.pk %}">{{ course.title }}</a>
+                        </h2>
+                        {% if course.subtitle %}
+                            <p class="home-card-sub">{{ course.subtitle|truncatechars:90 }}</p>
+                        {% endif %}
+                        <p class="home-card-meta">
+                            by {{ course.instructor.get_full_name|default:course.instructor.username }}
+                        </p>
+                    </div>
+
+                    <div class="home-card-foot">
+                        <span class="home-price{% if not course.price %} home-price-free{% endif %}">
+                            {% if course.price > 0 %}${{ course.price|floatformat:2 }}{% else %}Free{% endif %}
+                        </span>
+                        <a class="home-card-cta" href="{% url 'courses:outline' course.pk %}">
+                            View outline &rarr;
+                        </a>
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
+
+        {% if page_obj.has_other_pages %}
+            <nav class="mt-4" aria-label="Catalogue pages">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?{% if q %}q={{ q|urlencode }}&amp;{% endif %}{% if selected_category %}category={{ selected_category.pk }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">Previous</a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled"><span class="page-link">Previous</span></li>
+                    {% endif %}
+
+                    {% for number in page_obj.paginator.page_range %}
+                        <li class="page-item{% if number == page_obj.number %} active{% endif %}">
+                            <a class="page-link" href="?{% if q %}q={{ q|urlencode }}&amp;{% endif %}{% if selected_category %}category={{ selected_category.pk }}&amp;{% endif %}page={{ number }}">{{ number }}</a>
+                        </li>
+                    {% endfor %}
+
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?{% if q %}q={{ q|urlencode }}&amp;{% endif %}{% if selected_category %}category={{ selected_category.pk }}&amp;{% endif %}page={{ page_obj.next_page_number }}">Next</a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled"><span class="page-link">Next</span></li>
+                    {% endif %}
+                </ul>
+            </nav>
+        {% endif %}
+    {% else %}
+        <div class="home-empty">
+            <h2>No courses found.</h2>
+            <p>
+                {% if q or selected_category %}
+                    Try a different search term or category.
+                {% else %}
+                    Published courses will appear here as soon as instructors add them.
+                {% endif %}
+            </p>
+              <a class="home-btn home-btn-primary" href="{% url 'home' %}">Back to home</a>
+           </div>
+    {% endif %}
+</div>
+{% endblock %}

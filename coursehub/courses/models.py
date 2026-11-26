@@ -119,6 +119,20 @@ class Course(models.Model):
 
         return round((completed_lessons / total_lessons) * 100)
 
+    def has_completed_at_least(self, student, percentage=50):
+        """Check course completion against an exact percentage threshold."""
+        total_lessons = Lesson.objects.filter(module__course=self).count()
+
+        if total_lessons == 0:
+            return False
+
+        completed_lessons = LessonProgress.objects.filter(
+            student=student,
+            lesson__module__course=self,
+        ).count()
+
+        return completed_lessons * 100 >= total_lessons * percentage
+
 
 class Module(models.Model):
     course = models.ForeignKey('Course', on_delete=models.CASCADE, related_name='modules')
