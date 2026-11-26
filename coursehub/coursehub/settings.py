@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 import dj_database_url
 import os
+import sys
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -138,14 +139,21 @@ STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
+# The manifest storage needs collectstatic to have run. Use the plain storage
+# in local development (DEBUG) and when running the test suite.
+if DEBUG or "test" in sys.argv:
+    STATICFILES_BACKEND = "django.contrib.staticfiles.storage.StaticFilesStorage"
+else:
+    STATICFILES_BACKEND = (
+        "whitenoise.storage.CompressedManifestStaticFilesStorage"
+    )
+
 STORAGES = {
     "default": {
         "BACKEND": "django.core.files.storage.FileSystemStorage",
     },
     "staticfiles": {
-        "BACKEND": (
-            "whitenoise.storage.CompressedManifestStaticFilesStorage"
-        ),
+        "BACKEND": STATICFILES_BACKEND,
     },
 }
 
