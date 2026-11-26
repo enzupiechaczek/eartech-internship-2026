@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}My medical history | HealthPulse{% endblock %}
+{% block main_class %}hp-main--narrow{% endblock %}
+
+{% block content %}
+<section class="hp-page-head">
+    <div>
+        <p class="hp-eyebrow">Patient portal</p>
+        <h1>My medical history</h1>
+        <p>Your completed visits, newest first.</p>
+    </div>
+</section>
+
+{% if encounters %}
+<ol class="hp-timeline">
+    {% for encounter in encounters %}
+    <li>
+        <article class="hp-card d-flex flex-column gap-3">
+            <div class="d-flex flex-wrap justify-content-between gap-2">
+                <span class="hp-timeline__date">{{ encounter.appointment.appointment_date|date:"j M Y" }}</span>
+                <span class="text-muted">
+                    Dr. {{ encounter.doctor.user.get_full_name|default:encounter.doctor.user.username }}
+                    {% if encounter.doctor.specialty %}· {{ encounter.doctor.specialty }}{% endif %}
+                </span>
+            </div>
+            <h2 class="m-0" style="font-size: 1.625rem;">{{ encounter.diagnosis }}</h2>
+            <p class="m-0"><strong>Complaint:</strong> {{ encounter.chief_complaint }}</p>
+            {% if encounter.treatment_notes %}
+                <p class="m-0"><strong>Treatment notes:</strong> {{ encounter.treatment_notes }}</p>
+            {% endif %}
+
+            {% if encounter.prescriptions.all or encounter.files.all %}
+            <div class="d-flex flex-wrap gap-3">
+                {% if encounter.prescriptions.all %}
+                <div class="hp-chip-box">
+                    <h3 class="hp-field-label mb-2">Prescriptions</h3>
+                    <ul class="hp-plain-list">
+                        {% for p in encounter.prescriptions.all %}
+                        <li>
+                            <strong>{{ p.medication_name }}</strong>
+                            — {{ p.dosage }}, {{ p.frequency }}, for {{ p.duration }}
+                            {% if p.instructions %}<br><small class="text-muted">{{ p.instructions }}</small>{% endif %}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                {% if encounter.files.all %}
+                <div class="hp-chip-box">
+                    <h3 class="hp-field-label mb-2">Files</h3>
+                    <ul class="hp-files">
+                        {% for f in encounter.files.all %}
+                        <li class="d-flex justify-content-between gap-2">
+                            <span><span class="hp-file__name">{{ f.title }}</span> <span class="text-muted small">· {{ f.get_file_type_display }}</span></span>
+                            <a href="{% url 'download_file' f.pk %}" target="_blank" rel="noopener" aria-label="Open {{ f.title }}">Open</a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+        </article>
+    </li>
+    {% endfor %}
+</ol>
+{% else %}
+<div class="alert alert-info">
+    No completed visits yet. Once a doctor completes a visit, it will appear here.
+</div>
+{% endif %}
+
+{% if other_files %}
+<section class="hp-card mt-4">
+    <h2 class="mb-3">Other files</h2>
+    <ul class="hp-files">
+        {% for f in other_files %}
+        <li class="hp-file">
+            <span>
+                <span class="hp-file__name">{{ f.title }}</span>
+                <span class="hp-file__meta">{{ f.get_file_type_display }} · uploaded {{ f.uploaded_at|date:"j M Y" }}</span>
+            </span>
+            <a href="{% url 'download_file' f.pk %}" target="_blank" rel="noopener">Open</a>
+        </li>
+        {% endfor %}
+    </ul>
+</section>
+{% endif %}
+{% endblock %}

@@ -1,148 +1,43 @@
-{% load static %}
-<!DOCTYPE html><html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Doctor Profile | HealthPulse</title><style>
-    * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-    }
+{% extends 'base.html' %}
 
-    body {
-        font-family: Arial, sans-serif;
-        background-color: #f4f7fb;
-        color: #263238;
-        line-height: 1.6;
-    }
+{% block title %}Dr. {{ doctor.user.get_full_name|default:doctor.user.username }} | HealthPulse{% endblock %}
+{% block main_class %}hp-main--narrow{% endblock %}
 
-    .container {
-        max-width: 900px;
-        margin: 50px auto;
-        padding: 20px;
-    }
+{% block content %}
+<a href="{% url 'doctor_directory' %}" class="hp-back">&larr; Back to directory</a>
 
-    .doctor-card {
-        background: white;
-        border-radius: 16px;
-        padding: 35px;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
-    }
-
-    .doctor-header {
-        display: flex;
-        align-items: center;
-        gap: 25px;
-        margin-bottom: 30px;
-    }
-
-    .doctor-image {
-        width: 150px;
-        height: 150px;
-        border-radius: 50%;
-        object-fit: cover;
-        background-color: #e8eef5;
-    }
-
-    .doctor-name {
-        font-size: 28px;
-        color: #176b87;
-        margin-bottom: 8px;
-    }
-
-    .specialty {
-        color: #607d8b;
-        font-size: 18px;
-    }
-
-    .section {
-        margin-top: 25px;
-    }
-
-    .section h2 {
-        color: #176b87;
-        font-size: 20px;
-        margin-bottom: 10px;
-    }
-
-    .section p {
-        color: #546e7a;
-    }
-
-    .book-button {
-        display: inline-block;
-        margin-top: 30px;
-        padding: 12px 25px;
-        background-color: #176b87;
-        color: white;
-        text-decoration: none;
-        border-radius: 8px;
-        font-weight: bold;
-    }
-
-    .book-button:hover {
-        background-color: #12546b;
-    }
-
-    @media (max-width: 600px) {
-        .doctor-header {
-            flex-direction: column;
-            text-align: center;
-        }
-
-        .doctor-card {
-            padding: 20px;
-        }
-    }
-</style>
-
-</head><body><div class="container">
-    <div class="doctor-card">
-
-        <div class="doctor-header">
-
-            {% if doctor.profile_picture %}
-                <img src="{{ doctor.profile_picture.url }}"
-                     alt="Doctor Profile Picture"
-                     class="doctor-image">
-            {% else %}
-                <div class="doctor-image"></div>
-            {% endif %}
-
-            <div>
-                <h1 class="doctor-name">
-                    Dr. {{ doctor.user.get_full_name }}
-                </h1>
-
-                <p class="specialty">
-                    {{ doctor.specialty }}
-                </p>
-            </div>
-
+<article class="hp-card p-4 p-md-5">
+    <div class="d-flex flex-wrap align-items-center gap-4 mb-4">
+        {% if doctor.profile_picture %}
+            <img src="{{ doctor.profile_picture.url }}" alt="Doctor Profile Picture" class="hp-avatar">
+        {% else %}
+            <span class="hp-avatar" aria-hidden="true">{% include "includes/initials.html" with u=doctor.user %}</span>
+        {% endif %}
+        <div>
+            <h1 class="mb-1">Dr. {{ doctor.user.get_full_name|default:doctor.user.username }}</h1>
+            <p class="text-muted mb-0 fs-5">{{ doctor.specialty|default:"Specialty not specified" }}</p>
         </div>
-
-        <div class="section">
-            <h2>About the Doctor</h2>
-            <p>{{ doctor.bio }}</p>
-        </div>
-
-        <div class="section">
-            <h2>Qualifications</h2>
-            <p>{{ doctor.qualifications }}</p>
-        </div>
-
-        <div class="section">
-            <h2>Clinic Location</h2>
-            <p>{{ doctor.clinic_branch }}</p>
-        </div>
-
-        <a href="#" class="book-button">
-            Book Appointment
-        </a>
-
     </div>
-</div>
 
-</body>
-</html>
+    <div class="hp-facts mb-4">
+        <div class="is-wide">
+            <h2 class="mb-2" style="font-size: 1.25rem;">About</h2>
+            <p class="mb-0">{{ doctor.bio|default:"No biography yet." }}</p>
+        </div>
+        <div>
+            <h2 class="mb-2" style="font-size: 1.25rem;">Qualifications</h2>
+            <p class="mb-0">{{ doctor.qualifications|default:"—" }}</p>
+        </div>
+        <div>
+            <h2 class="mb-2" style="font-size: 1.25rem;">Clinic</h2>
+            <p class="mb-0">{{ doctor.clinic_branch|default:"—" }}</p>
+        </div>
+    </div>
+
+    {% if user.is_authenticated and user.is_patient %}
+        <a href="{% url 'book_appointment' doctor.pk %}" class="btn btn-primary">Book an appointment</a>
+    {% elif not user.is_authenticated %}
+        <a href="{% url 'login' %}?next={% url 'book_appointment' doctor.pk %}" class="btn btn-primary">Log in to book</a>
+    {% endif %}
+</article>
+{% endblock %}

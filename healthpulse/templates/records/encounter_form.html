@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}{% if encounter.pk %}Edit{% else %}Record{% endif %} encounter | HealthPulse{% endblock %}
+
+{% block content %}
+<section class="hp-page-head">
+    <div>
+        <p class="hp-eyebrow">{% if encounter.pk %}Edit encounter{% else %}Record encounter{% endif %} · {{ encounter.appointment.appointment_date|date:"j M Y" }}</p>
+        <h1>{{ encounter.patient.user.get_full_name|default:encounter.patient.user.username }}</h1>
+        <p>Reason for visit: {{ encounter.appointment.reason_for_visit }}</p>
+    </div>
+</section>
+
+<form method="post" enctype="multipart/form-data" class="hp-form hp-stack">
+    {% csrf_token %}
+
+    <section class="hp-card">
+        <h2 class="mb-3">Visit notes</h2>
+        {% if form.non_field_errors %}
+            <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+        {% endif %}
+        {% for field in form %}{% include "includes/field.html" %}{% endfor %}
+    </section>
+
+    <section class="hp-card">
+        <h2 class="mb-3">Prescriptions</h2>
+        {{ formset.management_form }}
+        {% if formset.non_form_errors %}
+            <div class="alert alert-danger">{{ formset.non_form_errors }}</div>
+        {% endif %}
+        <div id="prescription-forms">
+            {% for prescription_form in formset %}
+                <div class="prescription-form hp-subform">
+                    {% include "includes/subform.html" with subform=prescription_form noun="prescription" %}
+                </div>
+            {% endfor %}
+        </div>
+        <button type="button" id="add-prescription" class="btn btn-outline-secondary">+ Add prescription</button>
+    </section>
+
+    <section class="hp-card">
+        <h2 class="mb-1">Diagnostic files</h2>
+        <p class="text-muted">PDF, JPG or PNG, up to 10 MB.</p>
+        {{ file_formset.management_form }}
+        {% if file_formset.non_form_errors %}
+            <div class="text-danger">{{ file_formset.non_form_errors }}</div>
+        {% endif %}
+        <div id="medical-file-forms">
+            {% for file_form in file_formset %}
+                <div class="medical-file-form hp-subform">
+                    {% if file_form.instance.pk %}
+                        <p class="mb-2">
+                            Current file:
+                            <a href="{% url 'download_file' file_form.instance.pk %}" target="_blank" rel="noopener">{{ file_form.instance.title }}</a>
+                            <small class="text-muted">(choose a new file below to replace it)</small>
+                        </p>
+                    {% endif %}
+                    {% include "includes/subform.html" with subform=file_form noun="file" %}
+                </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <div class="hp-actions">
+        <button type="submit" class="btn btn-primary">Save encounter</button>
+        <a href="{% if encounter.pk %}{% url 'encounter_detail' encounter.pk %}{% else %}{% url 'doctor_dashboard' %}{% endif %}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+</form>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const container = document.getElementById("prescription-forms");
+    const addButton = document.getElementById("add-prescription");
+    const totalForms = document.getElementById("id_prescriptions-TOTAL_FORMS");
+
+    addButton.addEventListener("click", function () {
+        const forms = container.querySelectorAll(".prescription-form");
+        if (!forms.length) {
+            return;
+        }
+        const index = parseInt(totalForms.value, 10);
+        const newForm = forms[forms.length - 1].cloneNode(true);
+
+        newForm.innerHTML = newForm.innerHTML.replace(/prescriptions-(\d+)-/g, "prescriptions-" + index + "-");
+        newForm.querySelectorAll("input, textarea, select").forEach(function (field) {
+            if (field.type !== "hidden" && field.type !== "checkbox") {
+                field.value = "";
+            } else if (field.type === "checkbox") {
+                field.checked = false;
+            } else if (field.type === "hidden" && /-id$/.test(field.name)) {
+                field.value = "";
+            }
+        });
+        newForm.querySelectorAll(".hp-error, .hp-remove").forEach(function (el) { el.remove(); });
+        newForm.querySelectorAll(".has-error").forEach(function (el) { el.classList.remove("has-error"); });
+
+        container.appendChild(newForm);
+        totalForms.value = index + 1;
+    });
+});
+</script>
+{% endblock %}

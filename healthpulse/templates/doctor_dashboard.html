@@ -1,51 +1,91 @@
 {% extends 'base.html' %}
 
+{% block title %}Dashboard | HealthPulse{% endblock %}
+
 {% block content %}
+<section class="hp-page-head">
+    <div>
+        <p class="hp-eyebrow">Doctor portal</p>
+        <h1>Welcome Dr. {{ request.user.get_full_name|default:request.user.username }}</h1>
+    </div>
+    <div class="hp-actions">
+        {% if request.user.is_staff %}
+            <a href="{% url 'admin:index' %}" class="btn btn-outline-primary">Admin panel</a>
+        {% endif %}
+        <a href="{% url 'pending_requests' %}" class="btn btn-primary">
+            {% if pending_count %}Review {{ pending_count }} pending request{{ pending_count|pluralize }}{% else %}Pending requests{% endif %}
+        </a>
+    </div>
+</section>
 
-    <h1>Welcome Dr. {{ request.user.username }}</h1>
+<section class="hp-stats" aria-label="Summary">
+    <div class="hp-stat">
+        <p class="hp-stat__label">Pending requests</p>
+        <p class="hp-stat__value">{{ pending_count }}</p>
+    </div>
+    <div class="hp-stat">
+        <p class="hp-stat__label">Visits in progress</p>
+        <p class="hp-stat__value">{{ in_visit_count }}</p>
+    </div>
+    <div class="hp-stat">
+        <p class="hp-stat__label">Completed visits</p>
+        <p class="hp-stat__value">{{ completed_count }}</p>
+    </div>
+</section>
 
-    <h2>Quick Links</h2>
-
-    <ul>
-        <li>
-            <a href="{% url 'doctor_dashboard' %}">
-                My Dashboard
-            </a>
-        </li>
-        
-
-        <li>
-            <a href="{% url 'pending_requests' %}">
-                Pending Requests
-            </a>
-        </li>
-
-        <li>
-            <a href="{% url 'patient_dashboard' %}">
-                Patient Dashboard
-            </a>
-        </li>
-
-        <li>
-            <a href="{% url 'admin:index' %}">
-                Admin Panel
-            </a>
-        </li>
-    </ul>
-     <hr>
-    <h3>My Appointments</h3>
-    
+<section class="hp-card hp-card--flush">
+    <div class="hp-card__head">
+        <h2>Approved and active appointments</h2>
+        <span class="text-muted small">Approved, in visit and completed</span>
+    </div>
     {% if appointments %}
-        <ul>
-        {% for appt in appointments %}
-            <li>
-                Patient: {{ appt.patient }} - Status: {{ appt.status }}
-                <a href="{% url 'records:start_visit' appt.pk %}">Start Visit</a>
-            </li>
-        {% endfor %}
-        </ul>
+    <div class="hp-table-wrap">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Patient</th>
+                    <th>Date</th>
+                    <th>Reason</th>
+                    <th>Status</th>
+                    <th>Encounter</th>
+                    <th>Records</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for appointment in appointments %}
+                <tr>
+                    <td class="fw-semibold">{{ appointment.patient.user.get_full_name|default:appointment.patient.user.username }}</td>
+                    <td class="text-nowrap">{{ appointment.appointment_date|date:"j M Y" }} · {{ appointment.time_slot|time:"H:i" }}</td>
+                    <td class="text-muted hp-reason">{{ appointment.reason_for_visit|truncatechars:80 }}</td>
+                    <td>{% include "includes/status.html" with appt=appointment %}</td>
+                    <td>
+                        {% if appointment.existing_encounter and appointment.status == "COMPLETED" %}
+                        <a href="{% url 'encounter_detail' appointment.existing_encounter.pk %}" class="btn btn-sm btn-outline-secondary">View encounter</a>
+                        {% elif appointment.existing_encounter %}
+                        <a href="{% url 'encounter_detail' appointment.existing_encounter.pk %}" class="btn btn-sm btn-outline-primary">Continue visit</a>
+                        {% elif appointment.status == "APPROVED" and appointment.is_future %}
+                        <span class="hp-hint">Starts {{ appointment.appointment_date|date:"j M Y" }}</span>
+                        {% elif appointment.status == "APPROVED" %}
+                        <form method="post" action="{% url 'start_visit' appointment.pk %}" class="m-0">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-success">Start visit</button>
+                        </form>
+                        {% elif appointment.status == "IN_VISIT" %}
+                        <a href="{% url 'encounter_create' appointment.pk %}" class="btn btn-sm btn-primary">Record encounter</a>
+                        {% else %}
+                        <span class="hp-hint">—</span>
+                        {% endif %}
+                    </td>
+                    <td><a href="{% url 'patient_medical_chart' appointment.patient_id %}" class="btn btn-sm btn-outline-secondary">Chart</a></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
     {% else %}
-        <p>No appointments found.</p>
+    <div class="hp-card__body">
+        <p class="text-muted mb-0">No approved or active appointments.</p>
+    </div>
     {% endif %}
-
+</section>
 {% endblock %}

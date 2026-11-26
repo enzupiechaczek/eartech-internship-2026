@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Medical Chart | HealthPulse{% endblock %}
+
+{% block content %}
+<a href="{% url 'doctor_dashboard' %}" class="hp-back">&larr; Back to dashboard</a>
+
+<section class="hp-page-head">
+    <div>
+        <p class="hp-eyebrow">Medical Chart</p>
+        <h1>{{ patient.user.get_full_name|default:patient.user.username }}</h1>
+    </div>
+    <a href="{% url 'medical_file_upload' patient.pk %}" class="btn btn-primary">Upload diagnostic file</a>
+</section>
+
+<div class="hp-split">
+    <section class="hp-split__main">
+        <div class="hp-card hp-card--flush">
+            <div class="hp-card__head"><h2>My encounters with this patient</h2></div>
+            {% if encounters %}
+            <div class="hp-table-wrap">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Visit date</th>
+                            <th>Diagnosis</th>
+                            <th>Prescriptions</th>
+                            <th>Status</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for encounter in encounters %}
+                        <tr>
+                            <td class="text-nowrap">{{ encounter.appointment.appointment_date|date:"j M Y" }}</td>
+                            <td class="fw-semibold">{{ encounter.diagnosis }}</td>
+                            <td>{{ encounter.prescriptions.all|length }}</td>
+                            <td>{% include "includes/status.html" with appt=encounter.appointment %}</td>
+                            <td><a href="{% url 'encounter_detail' encounter.pk %}" class="btn btn-sm btn-outline-secondary">View</a></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="hp-card__body"><p class="text-muted mb-0">No encounters recorded yet.</p></div>
+            {% endif %}
+        </div>
+    </section>
+
+    <aside class="hp-split__side">
+        <section class="hp-card">
+            <h2 class="mb-3">Diagnostic files</h2>
+            {% if files %}
+            <ul class="hp-files">
+                {% for medical_file in files %}
+                <li class="hp-file">
+                    <span>
+                        <span class="hp-file__name">{{ medical_file.title }}</span>
+                        <span class="hp-file__meta">{{ medical_file.get_file_type_display }} · uploaded {{ medical_file.uploaded_at|date:"j M Y" }}</span>
+                    </span>
+                    <a href="{% url 'download_file' medical_file.pk %}" target="_blank" rel="noopener">Open</a>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="text-muted mb-0">No files uploaded.</p>
+            {% endif %}
+        </section>
+    </aside>
+</div>
+{% endblock %}

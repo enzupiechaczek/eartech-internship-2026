@@ -3,7 +3,8 @@ from django.contrib.auth.views import LoginView, LogoutView
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import render, redirect
 from django.urls import reverse
-from django.db.models import Q
+from django.db.models import Count, Q
+from django.utils import timezone
 from django.views.generic import DetailView
 
 
@@ -45,7 +46,46 @@ def home_redirect(request):
 
 @doctor_required
 def doctor_dashboard(request):
-    return render(request, 'doctor_dashboard.html')
+    appointments = (
+        Appointment.objects.filter(
+            doctor=request.user.doctorprofile,
+            status__in=[
+                Appointment.Status.APPROVED,
+                Appointment.Status.IN_VISIT,
+                Appointment.Status.COMPLETED,
+            ],
+        )
+        .select_related("patient__user")
+        .order_by("appointment_date", "time_slot")
+    )
+
+    for appointment in appointments:
+        appointment.existing_encounter = getattr(
+            appointment,
+            "encounter",
+            None,
+        )
+
+    status_counts = {
+        row["status"]: row["n"]
+        for row in Appointment.objects.filter(doctor=request.user.doctorprofile)
+        .values("status")
+        .annotate(n=Count("id"))
+    }
+
+    return render(
+        request,
+        'doctor_dashboard.html',
+        {
+            'appointments': appointments,
+            'pending_count': Appointment.objects.filter(
+                doctor=request.user.doctorprofile,
+                status=Appointment.Status.PENDING,
+            ).filter(Appointment.upcoming_q()).count(),
+            'in_visit_count': status_counts.get(Appointment.Status.IN_VISIT, 0),
+            'completed_count': status_counts.get(Appointment.Status.COMPLETED, 0),
+        },
+    )
 
 
 @patient_required
@@ -67,7 +107,8 @@ class RoleLoginView(LoginView):
     template_name = 'login.html'
 
     def get_success_url(self):
-        return reverse('home_redirect')
+        # get_redirect_url() returns ?next= only if it is a safe, same-host URL.
+        return self.get_redirect_url() or reverse('home_redirect')
 
 
 class RoleLogoutView(LogoutView):
