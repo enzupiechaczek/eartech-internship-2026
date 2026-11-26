@@ -1,0 +1,41 @@
+﻿
+{% extends "base.html" %}
+
+{% block title %}My Patients — HealthPulse{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+    <h2 class="mb-3">My Patients ({{ patients|length }})</h2>
+
+    <form method="GET" class="mb-4">
+        <div class="input-group">
+            <input
+                type="text"
+                name="q"
+                class="form-control"
+                placeholder="Search by name or diagnosis..."
+                value="{{ q }}"
+            >
+            <button type="submit" class="btn btn-primary">
+                Search
+            </button>
+        </div>
+    </form>
+
+    {% if patients %}
+        <ul class="list-group">
+            {% for patient in patients %}
+                <li class="list-group-item">
+                    <strong>
+                        {{ patient.user.get_full_name|default:patient.user.username }}
+                    </strong>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="text-muted">No patients found.</p>
+    {% endif %}
+
+</div>
+{% endblock %}

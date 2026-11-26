@@ -1,0 +1,25 @@
+{% load hp_forms %}
+{# One form field: label without a colon, widget, help text, errors (red border via .has-error). #}
+{% if field.field.widget.input_type == "radio" %}
+{# Radio group: one <legend> names the group, and each option is announced once (aria-label on the input, visible text hidden from screen readers). #}
+<fieldset class="hp-field hp-choice-group{% if field.errors %} has-error{% endif %}"{% if field.errors %} aria-describedby="{{ field.auto_id }}_error"{% endif %}>
+    <legend class="hp-label">{{ field.label }}</legend>
+    <div class="hp-choices" id="{{ field.auto_id }}">
+        {% for choice in field %}
+        <label class="hp-choice" for="{{ choice.id_for_label }}">
+            <input type="radio" name="{{ field.html_name }}" value="{{ choice.data.value }}" id="{{ choice.id_for_label }}"
+                   aria-label="{{ choice.choice_label }}"{% if choice.data.selected %} checked{% endif %}{% if field.field.required %} required{% endif %}>
+            <span aria-hidden="true">{{ choice.choice_label }}</span>
+        </label>
+        {% endfor %}
+    </div>
+    {% if field.errors %}<div class="hp-error" id="{{ field.auto_id }}_error">{{ field.errors|join:" " }}</div>{% endif %}
+</fieldset>
+{% else %}
+<div class="hp-field{% if field.errors %} has-error{% endif %}">
+    <label class="hp-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+    {{ field|with_aria }}
+    {% if field.help_text %}<div class="helptext">{{ field.help_text|safe }}</div>{% endif %}
+    {% if field.errors %}<div class="hp-error" id="{{ field.auto_id }}_error">{{ field.errors|join:" " }}</div>{% endif %}
+</div>
+{% endif %}

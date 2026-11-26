@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Log in | HealthPulse{% endblock %}
+
+{% block body %}
+<div class="hp-auth">
+    {% include "includes/auth_brand.html" %}
+    <section class="hp-auth__panel">
+        <div class="hp-auth__card">
+            <h2>Welcome back</h2>
+            <p class="text-muted mt-1 mb-4">Log in to continue.</p>
+            {% include "includes/messages.html" %}
+            <form method="post" class="hp-form">
+                {% csrf_token %}
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger" role="alert">{{ form.non_field_errors|join:" " }}</div>
+                {% endif %}
+                {% for field in form %}{% include "includes/field.html" %}{% endfor %}
+                {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+                <button type="submit" class="btn btn-primary w-100">Log in</button>
+            </form>
+            <p class="text-center text-muted mt-4 mb-0">No account? <a href="{% url 'register' %}">Create an account</a></p>
+        </div>
+    </section>
+</div>
+{% endblock %}

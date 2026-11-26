@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}Book an appointment | HealthPulse{% endblock %}
+
+{% block content %}
+<div class="hp-narrow-col">
+    <a href="{% url 'doctor_detail' doctor.pk %}" class="hp-back">&larr; Back to profile</a>
+
+    <section class="hp-card">
+        <p class="hp-eyebrow">Book an appointment</p>
+        <h1 class="mb-4" style="font-size: 2rem;">Dr. {{ doctor.user.get_full_name|default:doctor.user.username }}</h1>
+
+        <form method="POST" class="hp-form">
+            {% csrf_token %}
+            {% for field in form %}{% include "includes/field.html" %}{% endfor %}
+            <div class="hp-actions">
+                <button type="submit" class="btn btn-primary">Request appointment</button>
+                <a href="{% url 'doctor_detail' doctor.pk %}" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </form>
+    </section>
+</div>
+{% endblock %}

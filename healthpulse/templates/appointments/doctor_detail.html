@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+
+{% block title %}Dr. {{ doctor.user.get_full_name|default:doctor.user.username }} | HealthPulse{% endblock %}
+{% block main_class %}hp-main--narrow{% endblock %}
+
+{% block content %}
+<a href="{% url 'doctor_directory' %}" class="hp-back">&larr; Back to directory</a>
+
+<article class="hp-card p-4 p-md-5">
+    <div class="d-flex flex-wrap align-items-center gap-4 mb-4">
+        {% if doctor.profile_picture %}
+            <img src="{{ doctor.profile_picture.url }}" alt="Doctor Profile Picture" class="hp-avatar">
+        {% else %}
+            <span class="hp-avatar" aria-hidden="true">{% include "includes/initials.html" with u=doctor.user %}</span>
+        {% endif %}
+        <div>
+            <h1 class="mb-1">Dr. {{ doctor.user.get_full_name|default:doctor.user.username }}</h1>
+            <p class="text-muted mb-0 fs-5">{{ doctor.specialty|default:"Specialty not specified" }}</p>
+        </div>
+    </div>
+
+    <div class="hp-facts mb-4">
+        <div class="is-wide">
+            <h2 class="mb-2" style="font-size: 1.25rem;">About</h2>
+            <p class="mb-0">{{ doctor.bio|default:"No biography yet." }}</p>
+        </div>
+        <div>
+            <h2 class="mb-2" style="font-size: 1.25rem;">Qualifications</h2>
+            <p class="mb-0">{{ doctor.qualifications|default:"—" }}</p>
+        </div>
+        <div>
+            <h2 class="mb-2" style="font-size: 1.25rem;">Clinic</h2>
+            <p class="mb-0">{{ doctor.clinic_branch|default:"—" }}</p>
+        </div>
+    </div>
+
+    {% if user.is_authenticated and user.is_patient %}
+        <a href="{% url 'book_appointment' doctor.pk %}" class="btn btn-primary">Book an appointment</a>
+    {% elif not user.is_authenticated %}
+        <a href="{% url 'login' %}?next={% url 'book_appointment' doctor.pk %}" class="btn btn-primary">Log in to book</a>
+    {% endif %}
+</article>
+{% endblock %}
