@@ -16,9 +16,9 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.conf import settings
-from django.conf.urls.static import static
-from django.urls import include, path
+from django.urls import include, path, re_path
 from django.contrib.auth import views as auth_views
+from django.views.static import serve
 
 from accounts.views import register
 from courses.views import home, about, StudioView
@@ -35,6 +35,12 @@ urlpatterns = [
     path("enrollments/", include("enrollments.urls")),
     path("reviews/", include("reviews.urls")),
     path("api/", include("courses.api_urls")),
+    # Serve uploaded media in every environment (Render runs with DEBUG off).
+    # Uploads on Render's ephemeral disk are lost on redeploy unless MEDIA_ROOT
+    # points at a persistent disk or external storage is used.
+    re_path(
+        r"^%s(?P<path>.*)$" % settings.MEDIA_URL.lstrip("/"),
+        serve,
+        {"document_root": settings.MEDIA_ROOT},
+    ),
 ]
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
