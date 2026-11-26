@@ -2037,6 +2037,163 @@ class LessonDetailTemplateTests(TestCase):
         self.assertContains(response, "Step 1: Install Python<br>Step 2: Install Django")
 
 
+class LessonCompletionFetchTests(TestCase):
+    """Verify template markup, CSRF setup, progress bar, error alert, and fetch hook (AB#3324)."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.instructor = User.objects.create_user(
+            username="fetch_instructor",
+            password="password123",
+            role="INSTRUCTOR",
+        )
+        self.student = User.objects.create_user(
+            username="fetch_student",
+            password="password123",
+            role="STUDENT",
+        )
+        self.course = Course.objects.create(
+            title="Async Django Course",
+            instructor=self.instructor,
+            status=Course.Status.PUBLISHED,
+        )
+        Enrollment.objects.create(
+            student=self.student,
+            course=self.course,
+        )
+        self.module = Module.objects.create(
+            course=self.course,
+            title="Module 1",
+            order=1,
+        )
+        self.lesson_1 = Lesson.objects.create(
+            module=self.module,
+            title="Lesson One",
+            order=1,
+        )
+        self.lesson_2 = Lesson.objects.create(
+            module=self.module,
+            title="Lesson Two",
+            order=2,
+        )
+        self.lesson_url = reverse("courses:lesson_view", args=[self.lesson_1.id])
+        self.complete_url = reverse("courses_api:complete_lesson", args=[self.lesson_1.id])
+        self.client.force_login(self.student)
+
+    def test_complete_button_renders_data_attributes_and_url(self):
+        response = self.client.get(self.lesson_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="complete-btn"')
+        self.assertContains(response, 'type="button"')
+        self.assertContains(response, f'data-url="{self.complete_url}"')
+        self.assertContains(response, f'data-id="{self.lesson_1.id}"')
+        self.assertContains(response, "Mark as Complete")
+
+    def test_csrf_setup_and_fetch_hook_rendered_for_enrolled_student(self):
+        response = self.client.get(self.lesson_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="csrfmiddlewaretoken"')
+        self.assertIn("csrftoken", response.cookies)
+        self.assertContains(response, "getCsrfToken()")
+        self.assertContains(response, "await fetch(url, {")
+        self.assertContains(response, 'method: "POST"')
+        self.assertContains(response, '"X-CSRFToken": getCsrfToken()')
+        self.assertContains(response, "data.percent")
+        self.assertContains(response, "data.lesson")
+
+    def test_progress_bar_elements_and_initial_percentage_rendered(self):
+        response = self.client.get(self.lesson_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="progress-bar"')
+        self.assertContains(response, 'role="progressbar"')
+        self.assertContains(response, 'style="width: 0%;"')
+        self.assertContains(response, 'aria-valuenow="0"')
+        self.assertContains(response, 'aria-valuemin="0"')
+        self.assertContains(response, 'aria-valuemax="100"')
+        self.assertContains(response, '<span id="progress-percent">0%</span>')
+
+        LessonProgress.objects.create(student=self.student, lesson=self.lesson_1)
+        next_response = self.client.get(
+            reverse("courses:lesson_view", args=[self.lesson_2.id])
+        )
+        self.assertContains(next_response, 'style="width: 50%;"')
+        self.assertContains(next_response, 'aria-valuenow="50"')
+        self.assertContains(next_response, '<span id="progress-percent">50%</span>')
+
+    def test_checkmark_elements_toggle_with_completion_state(self):
+        incomplete_response = self.client.get(self.lesson_url)
+        self.assertContains(
+            incomplete_response,
+            f'id="lesson-checkmark-{self.lesson_1.id}"',
+        )
+        self.assertContains(
+            incomplete_response,
+            f'id="sidebar-checkmark-{self.lesson_1.id}"',
+        )
+        self.assertContains(
+            incomplete_response,
+            'class="text-success me-1 d-none"',
+        )
+
+        LessonProgress.objects.create(student=self.student, lesson=self.lesson_1)
+        completed_response = self.client.get(self.lesson_url)
+        self.assertContains(
+            completed_response,
+            'class="text-success me-1"',
+        )
+        self.assertContains(
+            completed_response,
+            'class="badge bg-success"',
+        )
+        self.assertContains(completed_response, "Completed ✓")
+        self.assertContains(completed_response, "disabled")
+        self.assertNotContains(completed_response, 'id="complete-btn"')
+
+    def test_error_container_and_double_click_guard_rendered(self):
+        response = self.client.get(self.lesson_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="error-message"')
+        self.assertContains(response, 'class="alert alert-danger mt-3 mb-0 d-none"')
+        self.assertContains(response, 'role="alert"')
+        self.assertContains(response, "completeBtn.disabled = true;")
+        self.assertContains(response, "completeBtn.disabled = false;")
+
+    def test_instructor_does_not_render_completion_fetch_controls(self):
+        self.client.force_login(self.instructor)
+        response = self.client.get(self.lesson_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'id="progress-bar"')
+        self.assertNotContains(response, 'id="complete-btn"')
+        self.assertNotContains(response, 'id="error-message"')
+        self.assertNotContains(response, "await fetch(")
+
+    def test_csrf_protected_post_to_complete_endpoint_succeeds(self):
+        csrf_client = Client(enforce_csrf_checks=True)
+        csrf_client.force_login(self.student)
+
+        page_response = csrf_client.get(self.lesson_url)
+        csrftoken = page_response.cookies["csrftoken"].value
+
+        api_response = csrf_client.post(
+            self.complete_url,
+            HTTP_X_CSRFTOKEN=csrftoken,
+        )
+        self.assertEqual(api_response.status_code, 200)
+        self.assertEqual(
+            api_response.json(),
+            {"lesson": self.lesson_1.id, "percent": 50, "completed": True},
+        )
+
+        reloaded_response = csrf_client.get(self.lesson_url)
+        self.assertContains(reloaded_response, '<span id="progress-percent">50%</span>')
+        self.assertContains(reloaded_response, "Completed ✓")
+
+
 class MarkLessonCompleteTests(TestCase):
     """Mark lesson complete: API responses, CSRF and lesson page state."""
 
