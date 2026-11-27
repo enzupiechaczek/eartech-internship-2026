@@ -8,9 +8,9 @@
 <div class="container py-5">
 
     <a href="{% url 'enrollments:student_dashboard' %}"
-       class="btn btn-outline-secondary mb-4">
-        Back to My Learning
-    </a>
+   class="btn btn-primary mb-4">
+    Back to My Learning
+   </a>
 
     <h2>{{ enrollment.course.title }}</h2>
 
@@ -32,8 +32,11 @@
 
                 {% for lesson in module.lessons.all %}
 
-                    <div class="border-bottom py-2">
-                        {{ lesson.title }}
+                    <div class="border-bottom py-2 lesson-item position-relative">
+                            <a href="{% url 'courses:lesson_view' lesson.id %}"
+                            class="lesson-link stretched-link text-decoration-none text-dark">
+                                {{ lesson.title }}
+                            </a>
                     </div>
 
                 {% empty %}

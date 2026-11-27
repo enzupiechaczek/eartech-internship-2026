@@ -9,9 +9,8 @@ class RegisterForm(UserCreationForm):
 
     role = forms.ChoiceField(
         choices=[
-         (User.Role.STUDENT, 'Student'),
-         (User.Role.INSTRUCTOR, 'Instructor'),
-
+            (User.Role.STUDENT, 'Student'),
+            (User.Role.INSTRUCTOR, 'Instructor'),
         ],
         initial=User.Role.STUDENT,
         required=True
@@ -26,3 +25,13 @@ class RegisterForm(UserCreationForm):
             'password1',
             'password2',
         ]
+
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+
+        if User.objects.filter(email__iexact=email).exists():
+            raise forms.ValidationError(
+                "A user with this email address already exists."
+            )
+
+        return email
